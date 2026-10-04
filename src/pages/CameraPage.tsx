@@ -636,6 +636,7 @@ export default function CameraPage({
       const result = await confirmStep({
         po: detectedPO.pO,
         stepNumber: nextStep,
+        totalStep: detectedPO.totalStep,
       })
       if (result.success) {
         setConfirmResult(result)
@@ -650,6 +651,40 @@ export default function CameraPage({
         message: "Lỗi khi xác nhận. Vui lòng thử lại.",
       })
       setFlowStep("result")
+    }
+  }
+
+  // Tiếp tục chụp bước tiếp theo sau khi đã hoàn tất bước hiện tại
+  const handleContinueNextStep = () => {
+    if (!detectedPO) return
+
+    // Bước vừa hoàn tất
+    const completedStep =
+      detectedPO.totalStep > 0
+        ? Math.min(detectedPO.totalStep, detectedPO.currentStep + 1)
+        : (detectedPO.currentStep || 0) + 1
+
+    // Cập nhật detectedPO sang bước mới để useEffect tự động tải template ảnh mẫu mới
+    const updatedPO: PhotoPackingSummary = {
+      ...detectedPO,
+      currentStep: completedStep,
+      statusId: 1, // Đang chụp
+    }
+
+    setDetectedPO(updatedPO)
+    setCapturedImage(null)
+    setApiResult(null)
+    setConfirmResult(null)
+    setScanErrorMessage(null)
+    setDetectedCodeMeta(null)
+    setFlowStep("preview")
+
+    // Đảm bảo luồng camera tiếp tục hoạt động
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream
+      videoRef.current.play().catch(() => {})
+    } else {
+      startCamera(facingMode, resolution)
     }
   }
 
@@ -713,7 +748,9 @@ export default function CameraPage({
           <div className="flex items-center gap-1.5">
             <ScanLine className="w-4 h-4 text-cyan-400 animate-pulse" />
             <span className="font-semibold text-sm tracking-wide text-slate-200">
-              {targetOrder
+              {detectedPO
+                ? `Đơn #${detectedPO.pO}`
+                : targetOrder
                 ? `Đơn #${targetOrder.pO}`
                 : scannedPO
                 ? `PO #${scannedPO.pO.slice(-6)}`
@@ -724,9 +761,14 @@ export default function CameraPage({
                 : "Photo Packing Scanner"}
             </span>
           </div>
-          {(targetOrder || scannedPO) && (
+          {(detectedPO || targetOrder || scannedPO) && (
             <span className="text-[11px] text-cyan-300">
-              {targetOrder
+              {detectedPO
+                ? `${detectedPO.productCode} • Step ${Math.min(
+                    detectedPO.totalStep || 1,
+                    detectedPO.currentStep + 1
+                  )}/${detectedPO.totalStep || 1}`
+                : targetOrder
                 ? `${targetOrder.productCode} • Step ${targetOrder.currentStep}/${
                     targetOrder.totalStep || 1
                   }`
@@ -1118,7 +1160,9 @@ export default function CameraPage({
           open={flowStep === "done"}
           detectedPO={detectedPO}
           message={confirmResult.message}
+          confirmResult={confirmResult}
           onBackToList={handleClose}
+          onContinueNextStep={handleContinueNextStep}
         />
       )}
     </div>

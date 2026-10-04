@@ -455,7 +455,7 @@ useEffect(() => {
 | 4 | `uploading` | Đang gọi API gửi ảnh lên server (loading spinner) |
 | 5 | `result` | Server trả kết quả, hiển thị ảnh chụp + ảnh mẫu đối chiếu |
 | 6 | `confirming` | Đang gọi API xác nhận bước hoàn tất (loading spinner) |
-| 7 | `done` | Thành công! Hiển thị thông báo + nút quay về |
+| 7 | `done` | Thành công! Hiển thị thông báo: nếu còn bước thì cho phép "Chụp tiếp bước tiếp theo" hoặc "Tạm dừng", nếu đã hết bước thì "Hoàn tất & Về danh sách" |
 
 ### 5.2. Props — Dữ liệu đầu vào
 
@@ -688,15 +688,29 @@ const handleConfirmResult = async () => {
   const result = await confirmStep({
     po: detectedPO.pO,
     stepNumber: nextStep,
+    totalStep: detectedPO.totalStep,
   })
   if (result.success) {
     setConfirmResult(result)
-    setFlowStep("done")           // Hoàn tất!
+    setFlowStep("done")           // Hoàn tất! Mở NotifyResultDialog
   } else {
     setApiResult({ success: false, message: result.message })
     setFlowStep("result")         // Quay lại màn kết quả để thử lại
   }
 }
+
+// ═══ CHỤP TIẾP BƯỚC TIẾP THEO (NẾU CÒN BƯỚC) ═══
+// Khi bấm "Chụp tiếp bước X" trong NotifyResultDialog:
+const handleContinueNextStep = () => {
+  setDetectedPO({
+    ...detectedPO,
+    currentStep: nextStep,
+    statusId: 1, // Đang chụp
+  })
+  setCapturedImage(null)
+  setFlowStep("preview") // Quay lại camera live để chụp bước mới ngay lập tức
+}
+
 ```
 
 ### 5.9. So sánh ScanPage vs CameraPage
