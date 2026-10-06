@@ -19,7 +19,7 @@ import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
 import { fetchOrdersFromApi, fetchPhotosForOrderApi } from "@/services/photoPackingService"
 
 interface OrderListPageProps {
-  onOpenOrderCamera: (order: PhotoPackingSummary) => void
+  onOpenOrderCamera: (po: string) => void
   onOpenScanCamera: () => void
   isLoading?: boolean
   onRefresh?: () => Promise<void> | void
@@ -132,7 +132,7 @@ export default function OrderListPage({
     setViewingOrderPhotos([])
     setIsFetchingPhotos(true)
     try {
-      const result = await fetchPhotosForOrderApi(order.pO, order.currentStep)
+      const result = await fetchPhotosForOrderApi(order.pO)
       setViewingOrderPhotos(result.photoUrls)
     } catch (error) {
       console.error("Lỗi khi tải ảnh on-demand:", error)
@@ -382,7 +382,7 @@ export default function OrderListPage({
 
                             {isRetake ? (
                               <button
-                                onClick={() => onOpenOrderCamera(order)}
+                                onClick={() => onOpenOrderCamera(order.pO)}
                                 className="bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center p-2 rounded-lg active:opacity-90 transition-colors shadow-sm"
                                 title="Chụp lại"
                                 type="button"
@@ -391,7 +391,7 @@ export default function OrderListPage({
                               </button>
                             ) : isInProgress ? (
                               <button
-                                onClick={() => onOpenOrderCamera(order)}
+                                onClick={() => onOpenOrderCamera(order.pO)}
                                 className="bg-primary hover:bg-[#1b365d] text-white flex items-center justify-center p-2 rounded-lg active:opacity-90 transition-colors shadow-sm"
                                 title="Tiếp tục"
                                 type="button"
@@ -400,7 +400,7 @@ export default function OrderListPage({
                               </button>
                             ) : (
                               <button
-                                onClick={() => onOpenOrderCamera(order)}
+                                onClick={() => onOpenOrderCamera(order.pO)}
                                 className="bg-primary hover:bg-[#1b365d] text-white flex items-center justify-center p-2 rounded-lg active:opacity-90 transition-colors shadow-sm"
                                 title="Bắt đầu"
                                 type="button"
@@ -491,7 +491,7 @@ export default function OrderListPage({
                               <span>Xem</span>
                             </button>
                             <button
-                              onClick={() => onOpenOrderCamera(order)}
+                              onClick={() => onOpenOrderCamera(order.pO)}
                               className="flex items-center gap-1 px-3 py-1.5 bg-surface-container-high hover:bg-slate-200 border border-outline-variant text-secondary hover:text-primary rounded-lg text-[12px] font-semibold transition-colors shadow-sm active:scale-95"
                               title="Chụp lại ảnh"
                               type="button"
@@ -622,7 +622,7 @@ export default function OrderListPage({
                   onClick={() => {
                     const order = viewingOrder
                     setViewingOrder(null)
-                    onOpenOrderCamera(order)
+                    onOpenOrderCamera(order.pO)
                   }}
                   className="flex-1 bg-[#1b365d] hover:bg-[#132742] text-white"
                 >

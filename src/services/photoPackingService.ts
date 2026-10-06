@@ -1,119 +1,117 @@
 import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
-import { type PhotoPackingItem, castItemToSummary } from "@/types/photoPackingItem"
-import {
-  MOCK_PENDING_SUMMARIES,
-  MOCK_PHOTO_PACKING_ITEMS,
-} from "@/data/mockPhotoPacking"
+
+// Bộ nhớ đệm danh sách đơn hàng đã tải từ server Backend
+let cachedOrders: PhotoPackingSummary[] = []
+
+export function getCachedOrders(): PhotoPackingSummary[] {
+  return cachedOrders
+}
+
+export function setCachedOrders(orders: PhotoPackingSummary[]) {
+  cachedOrders = orders
+}
 
 /**
- * Giả lập API gọi lấy danh sách đơn hàng PO từ server backend
- * Trả về danh sách đơn hàng Chờ chụp và Đã hoàn tất sau khoảng thời gian xử lý của API.
- * 
- * LƯU Ý THEO YÊU CẦU:
- * 1. Tab "Chờ chụp": Chứa các PhotoPackingSummary có trạng thái "Chờ chụp" (0), "Đang chụp" (1), "Chụp lại" (2).
- * 2. Tab "Đã hoàn tất": Chứa các PhotoPackingItem được CAST sang PhotoPackingSummary với trạng thái = 3, currentStep = stepNo, totalStep = 0.
- * 3. Ảnh KHÔNG được nạp sẵn tại đây, chỉ được lấy về từ API on-demand khi mở dialog xem ảnh hoặc bên trong CameraPage.
+ * Gọi lấy danh sách đơn hàng PO từ server Backend API (/api/orders)
+ * Phân loại thành 2 danh sách: Chờ chụp (pending) và Đã hoàn tất (completed).
  */
 export async function fetchOrdersFromApi(): Promise<{
   pending: PhotoPackingSummary[]
   completed: PhotoPackingSummary[]
 }> {
-  // Giả lập độ trễ kết nối mạng từ server API (500ms)
-  await new Promise((resolve) => setTimeout(resolve, 500))
+  const res = await fetch("/api/orders")
+  if (!res.ok) {
+    throw new Error(`Lỗi kết nối Backend API: ${res.status} ${res.statusText}`)
+  }
 
-  // 1. Tab Chờ chụp: statusId 0, 1, 2
-  const pending: PhotoPackingSummary[] = MOCK_PENDING_SUMMARIES.filter(
-    (item) => item.statusId === 0 || item.statusId === 1 || item.statusId === 2
-  ).map((item) => ({
+  const data = await res.json()
+  const pending: PhotoPackingSummary[] = (data.pending || []).map((item: PhotoPackingSummary) => ({
     ...item,
-    photoUrls: [], // Ảnh chỉ lấy on-demand khi mở xem
+    photoUrls: item.photoUrls || [],
   }))
 
-  // 2. Tab Đã hoàn tất: Cast từ các PhotoPackingItem sang PhotoPackingSummary
-  // với statusId = 3, currentStep = stepNo, totalStep = 0
-  const completed: PhotoPackingSummary[] = MOCK_PHOTO_PACKING_ITEMS.filter(
-    (item) => item.photoUrl !== undefined
-  ).map((item) =>
-    castItemToSummary(item, {
-      photoUrls: [], // Không nạp sẵn ảnh, tải on-demand khi bấm nút "Xem"
-    })
-  )
+  const completed: PhotoPackingSummary[] = (data.completed || []).map((item: PhotoPackingSummary) => ({
+    ...item,
+    photoUrls: item.photoUrls || [],
+  }))
+
+  // Lưu vào bộ nhớ đệm phục vụ tra cứu nhanh khi quét mã
+  setCachedOrders([...pending, ...completed])
 
   return { pending, completed }
 }
 
 /**
- * API ON-DEMAND: Lấy ảnh đã chụp và ảnh mẫu đối chiếu cho một PO cụ thể
- * Chỉ được gọi khi người dùng bấm nút "Xem" mở Dialog xem ảnh hoặc bên trong CameraPage
+ * Gọi API on-demand: Lấy danh sách ảnh lưu (Image/Save) và ảnh mẫu (Image/Template) của 1 PO
  */
 export async function fetchPhotosForOrderApi(
-  po: string,
-  stepNo?: number
+  po: string
 ): Promise<{ photoUrls: string[]; samplePhotoUrl?: string }> {
-  // Giả lập độ trễ tải ảnh từ storage/CDN (200ms)
-  await new Promise((resolve) => setTimeout(resolve, 200))
-
-  const cleanPO = po.trim().toLowerCase()
-  const matchedItems = MOCK_PHOTO_PACKING_ITEMS.filter((item) => {
-    const itemPO = item.pO.trim().toLowerCase()
-    const poMatch = itemPO === cleanPO || itemPO.includes(cleanPO) || cleanPO.includes(itemPO)
-    if (!poMatch) return false
-    if (stepNo !== undefined && item.stepNo !== stepNo) return false
-    return true
-  })
-
-  const photoUrls: string[] = []
-  let samplePhotoUrl: string | undefined
-
-  matchedItems.forEach((item) => {
-    if (item.photoUrl) photoUrls.push(item.photoUrl)
-    if (item.samplePhotoUrl && !samplePhotoUrl) samplePhotoUrl = item.samplePhotoUrl
-  })
-
-  // Nếu không tìm thấy trong mock chi tiết, dùng ảnh mẫu dự phòng chất lượng cao
-  if (photoUrls.length === 0) {
-    photoUrls.push(
-      "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80"
-    )
+  try {
+    const res = await fetch(`/api/photos/${encodeURIComponent(po)}`)
+    if (res.ok) {
+      const data = await res.json()
+      return {
+        photoUrls: data.photoUrls || [],
+        samplePhotoUrl: data.samplePhotoUrl,
+      }
+    }
+  } catch (err) {
+    console.warn(`Lỗi khi tải ảnh cho PO ${po}:`, err)
   }
 
-  return { photoUrls, samplePhotoUrl }
+  return { photoUrls: [] }
 }
 
 /**
- * API ON-DEMAND: Lấy thông tin PhotoPackingItem của một bước chụp cụ thể bên trong CameraPage
- * Dùng để hiển thị ảnh mẫu template đối chiếu khi chuẩn bị chụp bước đó
+ * Tra cứu thông tin chi tiết một PO từ Backend API (/api/orders/{po})
  */
-export async function fetchStepItemApi(
-  po: string,
-  stepNo: number
-): Promise<PhotoPackingItem | null> {
-  await new Promise((resolve) => setTimeout(resolve, 150))
+export async function fetchOrderByPOApi(
+  po: string
+): Promise<PhotoPackingSummary> {
+  const cleanPO = (po || "").trim()
+  const lowerPO = cleanPO.toLowerCase()
 
-  const cleanPO = po.trim().toLowerCase()
-  const found = MOCK_PHOTO_PACKING_ITEMS.find((item) => {
-    const itemPO = item.pO.trim().toLowerCase()
-    return (
-      (itemPO === cleanPO || itemPO.includes(cleanPO) || cleanPO.includes(itemPO)) &&
-      item.stepNo === stepNo
-    )
-  })
+  // 1. Kiểm tra trong cache trước
+  const foundInCache = cachedOrders.find(
+    (item) => item.pO.trim().toLowerCase() === lowerPO
+  )
+  if (foundInCache) return foundInCache
 
-  if (found) return found
+  // 2. Gọi trực tiếp API
+  try {
+    const res = await fetch(`/api/orders/${encodeURIComponent(cleanPO)}`)
+    if (res.ok) {
+      const item: PhotoPackingSummary = await res.json()
+      if (item && item.pO) {
+        cachedOrders.push(item)
+        return item
+      }
+    }
+  } catch (err) {
+    console.warn(`Lỗi khi tra cứu PO ${cleanPO} từ Backend API:`, err)
+  }
 
-  // Nếu chưa có, trả về item mặc định có template đối chiếu
-  return {
-    pO: po,
-    productCode: "MẪU",
-    productName: "Quy chuẩn đóng gói",
+  // 3. Fallback: Nếu PO chưa có trong CSDL, trả về đối tượng cơ bản
+  // (Server vẫn trả về PhotoPackingSummary nếu không tìm thấy PO, chỉ không có thông tin Sản phẩm và ảnh mẫu)
+  const defaultPO: PhotoPackingSummary = {
+    pO: cleanPO,
+    productCode: "",
+    productName: "",
     group: "OSA",
     creator: "SYSTEM",
-    createTime: new Date(),
-    updator: "SYSTEM",
-    updatedTime: new Date(),
-    stepNo,
-    samplePhotoUrl:
-      "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80",
-    notes: `Bước ${stepNo}: Chụp ảnh đối chiếu sản phẩm và tem nhãn`,
+    createTime: new Date().toISOString(),
+    updator: "#AUTO",
+    updatedTime: new Date().toISOString(),
+    type: "Box",
+    productKey: "",
+    totalStep: 3,
+    currentStep: 0,
+    notes: "",
+    statusId: 0,
+    photoUrls: [],
   }
+
+  cachedOrders.push(defaultPO)
+  return defaultPO
 }

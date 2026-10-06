@@ -43,7 +43,10 @@ export function PhotoResultDialog({
       ? Math.min(detectedPO.totalStep, detectedPO.currentStep + 1)
       : detectedPO.currentStep || 1
 
-  const templateImageUrl = samplePhotoUrl || detectedPO.samplePhotoUrl
+  const templateImageUrl =
+    samplePhotoUrl ||
+    detectedPO.samplePhotoUrl ||
+    `/Image/Template/${detectedPO.type || "Box"}.jpg`
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onRetake()}>

@@ -21,15 +21,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { processScannedBarcodeResult } from "@/services/poLookup"
+import { validateImagePO, type POValidationResult } from "@/services/poLookup"
 import { submitPhoto, confirmStep } from "@/services/photoPackingApi"
 import type { SubmitPhotoResult, ConfirmStepResult } from "@/services/photoPackingApi"
-import { fetchStepItemApi } from "@/services/photoPackingService"
+import { fetchOrderByPOApi } from "@/services/photoPackingService"
 import { ConfirmPODialog } from "@/components/ConfirmPODialog"
 import { PhotoResultDialog } from "@/components/PhotoResultDialog"
 import { NotifyResultDialog } from "@/components/NotifyResultDialog"
 import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
-import type { PhotoPackingItem } from "@/types/photoPackingItem"
 
 /**
  * Các bước trong luồng chụp ảnh theo sơ đồ flowchart:
@@ -45,8 +44,7 @@ type CameraFlowStep =
   | "done"        // Hoàn tất, hiển thị thông báo thành công
 
 interface CameraPageProps {
-  targetOrder?: PhotoPackingSummary | null
-  scannedPO?: PhotoPackingSummary | null
+  po: string
   scannedCodeMeta?: { format?: string; codeType?: "barcode" | "qrcode" } | null
   onBack: () => void
 }
@@ -63,8 +61,7 @@ const RESOLUTION_CONFIG: Record<
 }
 
 export default function CameraPage({
-  targetOrder,
-  scannedPO,
+  po,
   scannedCodeMeta,
   onBack,
 }: CameraPageProps) {
@@ -98,47 +95,51 @@ export default function CameraPage({
   // Sample photo dialog
   const [isSampleDialogOpen, setIsSampleDialogOpen] = useState(false)
 
-  // Chi tiết bước chụp và ảnh mẫu đối chiếu (lấy on-demand từ API)
-  const [activeStepItem, setActiveStepItem] = useState<PhotoPackingItem | null>(null)
-
-  // === Luồng chụp ảnh theo sơ đồ flowchart ===
-  const [flowStep, setFlowStep] = useState<CameraFlowStep>("preview")
-  const [detectedPO, setDetectedPO] = useState<PhotoPackingSummary | null>(
-    scannedPO || targetOrder || null
-  )
-  const [apiResult, setApiResult] = useState<SubmitPhotoResult | null>(null)
-  const [confirmResult, setConfirmResult] = useState<ConfirmStepResult | null>(null)
-  const [scanErrorMessage, setScanErrorMessage] = useState<string | null>(null)
-
+  // Refs quản lý Camera phần cứng và canvas chụp ảnh
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const isCameraActiveRef = useRef(false)
-  const cameraRequestIdRef = useRef(0)
+  const cameraRequestIdRef = useRef<number>(0)
+  const isCameraActiveRef = useRef<boolean>(false)
 
-  // Tải thông tin bước và ảnh mẫu đối chiếu on-demand từ API
+  // State luồng chụp ảnh & kết quả nhận diện
+  const [flowStep, setFlowStep] = useState<CameraFlowStep>("preview")
+  const [currentPO, setCurrentPO] = useState<PhotoPackingSummary | null>(null)
+  const [isLoadingPO, setIsLoadingPO] = useState<boolean>(true)
+  const [poValidation, setPoValidation] = useState<POValidationResult | null>(null)
+  const [apiResult, setApiResult] = useState<SubmitPhotoResult | null>(null)
+  const [confirmResult, setConfirmResult] = useState<ConfirmStepResult | null>(null)
+  const [scanErrorMessage, setScanErrorMessage] = useState<string | null>(null)
+
+  // Nạp thông tin PO từ Server Backend API khi mở Camera
   useEffect(() => {
-    const currentPO = detectedPO || scannedPO || targetOrder
-    if (currentPO) {
-      const nextStep =
-        currentPO.totalStep > 0
-          ? Math.min(currentPO.totalStep, currentPO.currentStep + 1)
-          : currentPO.currentStep || 1
-
-      fetchStepItemApi(currentPO.pO, nextStep).then((item) => {
-        if (item) setActiveStepItem(item)
-      })
+    let isMounted = true
+    async function loadOrder() {
+      setIsLoadingPO(true)
+      try {
+        const order = await fetchOrderByPOApi(po)
+        if (isMounted) {
+          setCurrentPO(order)
+        }
+      } catch (err) {
+        console.warn("Lỗi khi tải thông tin PO:", err)
+      } finally {
+        if (isMounted) {
+          setIsLoadingPO(false)
+        }
+      }
     }
-  }, [detectedPO, scannedPO, targetOrder])
+    loadOrder()
+    return () => {
+      isMounted = false
+    }
+  }, [po])
 
-  // Ảnh mẫu đối chiếu (lấy từ activeStepItem vừa tải hoặc fallback ảnh mẫu chất lượng cao)
+  // Ảnh mẫu đối chiếu (lấy từ dữ liệu PO của Backend API)
   const samplePhotoUrl =
-    activeStepItem?.samplePhotoUrl ||
-    detectedPO?.samplePhotoUrl ||
-    targetOrder?.samplePhotoUrl ||
-    scannedPO?.samplePhotoUrl ||
-    "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&auto=format&fit=crop&q=80"
+    currentPO?.samplePhotoUrl ||
+    (currentPO?.type ? `/Image/Template/${currentPO.type}.jpg` : undefined)
 
   // Cập nhật capabilities của camera (flash, zoom, exposure)
   const inspectTrackCapabilities = useCallback((track: MediaStreamTrack) => {
@@ -393,7 +394,7 @@ export default function CameraPage({
     isCameraActiveRef.current = true
     setCapturedImage(null)
     setFlowStep("preview")
-    setDetectedPO(scannedPO || targetOrder || null)
+    setPoValidation(null)
     startCamera(facingMode, resolution)
 
     const handleBeforeUnload = () => {
@@ -414,64 +415,40 @@ export default function CameraPage({
     }
   }, [stream, capturedImage])
 
-  // Quét mã Barcode & QR Code từ canvas ảnh chụp → Detect PO → Chuyển sang bước Confirm
-  const processQRCode = (canvas: HTMLCanvasElement) => {
+  // Quét mã Barcode & QR Code từ canvas ảnh chụp → Kiểm tra và đối chiếu với PO đang chụp
+  const processScannedCode = (canvas: HTMLCanvasElement) => {
     setFlowStep("scanning")
     setScanErrorMessage(null)
 
-    // Đợi 700ms để hiển thị hiệu ứng laser quét mã sinh động
+    // Đợi 600ms để hiển thị hiệu ứng laser quét mã sinh động
     setTimeout(async () => {
       try {
-        // Luôn quét đồng thời cả Barcode 1D và QR Code 2D ("both")
-        const scanResult = await scanBarcodeFromCanvas(canvas, "both")
+        // Quét mã Barcode 1D & QR Code 2D từ ảnh canvas
+        const scanResult = await scanBarcodeFromCanvas(canvas)
 
-        if (scanResult?.text?.trim()) {
-          // Bắt mã đầu tiên phát hiện được và xử lý theo quy tắc nghiệp vụ
-          const processed = processScannedBarcodeResult(scanResult)
+        // Đối chiếu mã quét được với PO mục tiêu
+        const validation = validateImagePO(scanResult, po)
+        setPoValidation(validation)
 
-          if (!processed.success) {
-            // Mã không hợp lệ (ví dụ: QR không chứa PO 12 ký tự số hoặc barcode không khớp)
-            setCapturedImage(null)
-            setFlowStep("preview")
-            setScanErrorMessage(
-              processed.errorMessage || "Mã quét không hợp lệ. Vui lòng thử lại."
-            )
-            setTimeout(() => setScanErrorMessage(null), 5000)
-            return
-          }
-
-          // Nhận diện mã hợp lệ thành công
+        if (scanResult) {
           setDetectedCodeMeta({
-            format: processed.format,
-            codeType: processed.codeType,
+            format: scanResult.format,
+            codeType: scanResult.codeType,
           })
-          setDetectedPO(processed.poSummary!)
-          setFlowStep("confirm-po")
-          return
         }
 
-        // Trường hợp không phát hiện mã nào trong ảnh chụp:
-        // Nếu trước đó đã có đơn hàng được chọn từ trước (targetOrder hoặc scannedPO)
-        let fallbackPO = scannedPO || targetOrder || null
-        if (fallbackPO) {
-          setDetectedPO(fallbackPO)
-          setFlowStep("confirm-po")
-        } else {
-          // Không tìm thấy mã nào và cũng không có đơn hàng chọn sẵn
-          setCapturedImage(null)
-          setFlowStep("preview")
-          setScanErrorMessage(
-            "Không phát hiện mã Barcode hoặc QR Code trong ảnh. Vui lòng căn chỉnh rõ nét và chụp lại."
-          )
-          setTimeout(() => setScanErrorMessage(null), 5000)
-        }
+        // Chuyển sang dialog xác nhận kèm thông báo đối chiếu mã trên ảnh
+        setFlowStep("confirm-po")
       } catch {
-        setCapturedImage(null)
-        setFlowStep("preview")
-        setScanErrorMessage("Lỗi khi phân tích mã. Vui lòng thử lại.")
-        setTimeout(() => setScanErrorMessage(null), 4000)
+        setPoValidation({
+          status: "not_found",
+          targetPO: po,
+          message:
+            "Không phát hiện thấy mã vạch PO trên ảnh chụp (ảnh có thể bị mờ hoặc góc chụp không có tem nhãn).",
+        })
+        setFlowStep("confirm-po")
       }
-    }, 700)
+    }, 600)
   }
 
   // Chụp ảnh từ Video preview + Đóng dấu thời gian ở góc dưới bên phải (dd/MM/yyyy HH:mm)
@@ -548,8 +525,8 @@ export default function CameraPage({
     const dataUrl = canvas.toDataURL("image/jpeg", 0.95)
     setCapturedImage(dataUrl)
 
-    // Tiến hành quét QR
-    processQRCode(canvas)
+    // Tiến hành quét mã PO (Barcode & QR Code)
+    processScannedCode(canvas)
   }
 
   // Tải ảnh từ thiết bị (fallback)
@@ -569,7 +546,7 @@ export default function CameraPage({
 
         ctx.drawImage(img, 0, 0)
         setCapturedImage(event.target?.result as string)
-        processQRCode(canvas)
+        processScannedCode(canvas)
       }
       img.src = event.target?.result as string
     }
@@ -580,11 +557,10 @@ export default function CameraPage({
   const handleRetake = () => {
     setCapturedImage(null)
     setFlowStep("preview")
-    setDetectedPO(scannedPO || targetOrder || null)
     setApiResult(null)
     setConfirmResult(null)
     setScanErrorMessage(null)
-    setDetectedCodeMeta(null)
+    setPoValidation(null)
 
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream
@@ -594,49 +570,75 @@ export default function CameraPage({
     }
   }
 
-  // Xác nhận PO → gửi ảnh lên API (Send API lần 1)
+  // Xác nhận gửi ảnh lên server (Send API)
   const handleConfirmPO = async () => {
-    if (!detectedPO || !capturedImage) return
+    if (!currentPO || !capturedImage) return
     setFlowStep("uploading")
 
     try {
       const nextStep =
-        detectedPO.totalStep > 0
-          ? Math.min(detectedPO.totalStep, detectedPO.currentStep + 1)
-          : detectedPO.currentStep || 1
+        currentPO.totalStep > 0
+          ? Math.min(currentPO.totalStep, currentPO.currentStep + 1)
+          : currentPO.currentStep || 1
 
       const result = await submitPhoto({
-        po: detectedPO.pO,
+        po: currentPO.pO,
         stepNumber: nextStep,
         imageBase64: capturedImage,
-        productName: detectedPO.productName,
+        productName: currentPO.productName,
       })
-      setApiResult(result)
-      setFlowStep("result")
-    } catch {
+
+      if (result.success) {
+        const hasNextStep =
+          result.hasNextStep !== undefined
+            ? result.hasNextStep
+            : currentPO.totalStep > 0
+            ? nextStep < currentPO.totalStep
+            : false
+
+        const isCompleted =
+          result.isCompleted !== undefined ? result.isCompleted : !hasNextStep
+
+        setConfirmResult({
+          success: true,
+          message: result.message || `Đã lưu ảnh bước ${nextStep} cho PO ${currentPO.pO}.`,
+          hasNextStep,
+          nextStepNumber: result.nextStepNumber || (hasNextStep ? nextStep + 1 : undefined),
+          totalStep: result.totalStep || currentPO.totalStep,
+          isCompleted,
+        })
+        setFlowStep("done")
+      } else {
+        setApiResult({
+          success: false,
+          message: result.message || "Lỗi server khi lưu ảnh.",
+        })
+        setFlowStep("result")
+      }
+    } catch (err: any) {
       setApiResult({
         success: false,
-        message: "Lỗi kết nối server. Vui lòng kiểm tra mạng và thử lại.",
+        message: err?.message || "Lỗi kết nối server. Vui lòng kiểm tra mạng và thử lại.",
       })
       setFlowStep("result")
     }
   }
 
-  // Xác nhận kết quả OK → gọi API lần 2 (Confirm Step)
+  // Xác nhận kết quả OK (nếu hiển thị màn hình đối chiếu lỗi)
   const handleConfirmResult = async () => {
-    if (!detectedPO) return
+    if (!currentPO) return
     setFlowStep("confirming")
 
     try {
       const nextStep =
-        detectedPO.totalStep > 0
-          ? Math.min(detectedPO.totalStep, detectedPO.currentStep + 1)
-          : detectedPO.currentStep || 1
+        currentPO.totalStep > 0
+          ? Math.min(currentPO.totalStep, currentPO.currentStep + 1)
+          : currentPO.currentStep || 1
 
       const result = await confirmStep({
-        po: detectedPO.pO,
+        po: currentPO.pO,
         stepNumber: nextStep,
-        totalStep: detectedPO.totalStep,
+        totalStep: currentPO.totalStep,
       })
       if (result.success) {
         setConfirmResult(result)
@@ -656,30 +658,27 @@ export default function CameraPage({
 
   // Tiếp tục chụp bước tiếp theo sau khi đã hoàn tất bước hiện tại
   const handleContinueNextStep = () => {
-    if (!detectedPO) return
+    if (!currentPO) return
 
-    // Bước vừa hoàn tất
     const completedStep =
-      detectedPO.totalStep > 0
-        ? Math.min(detectedPO.totalStep, detectedPO.currentStep + 1)
-        : (detectedPO.currentStep || 0) + 1
+      currentPO.totalStep > 0
+        ? Math.min(currentPO.totalStep, currentPO.currentStep + 1)
+        : (currentPO.currentStep || 0) + 1
 
-    // Cập nhật detectedPO sang bước mới để useEffect tự động tải template ảnh mẫu mới
     const updatedPO: PhotoPackingSummary = {
-      ...detectedPO,
+      ...currentPO,
       currentStep: completedStep,
       statusId: 1, // Đang chụp
     }
 
-    setDetectedPO(updatedPO)
+    setCurrentPO(updatedPO)
     setCapturedImage(null)
     setApiResult(null)
     setConfirmResult(null)
     setScanErrorMessage(null)
-    setDetectedCodeMeta(null)
+    setPoValidation(null)
     setFlowStep("preview")
 
-    // Đảm bảo luồng camera tiếp tục hoạt động
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream
       videoRef.current.play().catch(() => {})
@@ -746,39 +745,26 @@ export default function CameraPage({
         {/* Thông tin ở giữa */}
         <div className="flex flex-col items-center">
           <div className="flex items-center gap-1.5">
-            <ScanLine className="w-4 h-4 text-cyan-400 animate-pulse" />
+            <ScanLine
+              className={`w-4 h-4 text-cyan-400 ${
+                isLoadingPO ? "animate-spin" : "animate-pulse"
+              }`}
+            />
             <span className="font-semibold text-sm tracking-wide text-slate-200">
-              {detectedPO
-                ? `Đơn #${detectedPO.pO}`
-                : targetOrder
-                ? `Đơn #${targetOrder.pO}`
-                : scannedPO
-                ? `PO #${scannedPO.pO.slice(-6)}`
-                : capturedImage
-                ? flowStep === "scanning"
-                  ? "Đang phân tích ảnh..."
-                  : "Ảnh đã chụp"
-                : "Photo Packing Scanner"}
+              {currentPO ? `Đơn #${currentPO.pO}` : `Đơn #${po}`}
             </span>
           </div>
-          {(detectedPO || targetOrder || scannedPO) && (
-            <span className="text-[11px] text-cyan-300">
-              {detectedPO
-                ? `${detectedPO.productCode} • Step ${Math.min(
-                    detectedPO.totalStep || 1,
-                    detectedPO.currentStep + 1
-                  )}/${detectedPO.totalStep || 1}`
-                : targetOrder
-                ? `${targetOrder.productCode} • Step ${targetOrder.currentStep}/${
-                    targetOrder.totalStep || 1
-                  }`
-                : scannedPO
-                ? `${scannedPO.productCode} • Step ${scannedPO.currentStep + 1}/${
-                    scannedPO.totalStep || 1
-                  }`
-                : ""}
+          {isLoadingPO ? (
+            <span className="text-[10px] text-slate-400 animate-pulse">
+              Đang tải dữ liệu...
             </span>
-          )}
+          ) : currentPO ? (
+            <span className="text-[11px] text-cyan-300">
+              {currentPO.productCode ? `${currentPO.productCode} • ` : ""}Step{" "}
+              {Math.min(currentPO.totalStep || 1, currentPO.currentStep + 1)}/
+              {currentPO.totalStep || 1}
+            </span>
+          ) : null}
         </div>
 
         {/* Nút Close (icon X) ở góc trên bên phải */}
@@ -1070,15 +1056,24 @@ export default function CameraPage({
                 <ImageIcon className="w-4 h-4 text-cyan-400" />
                 Ảnh Mẫu Đóng Gói
               </DialogTitle>
-              {targetOrder && (
+              {currentPO && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 font-semibold">
-                  Đơn #{targetOrder.pO}
+                  Đơn #{currentPO.pO}
                 </span>
               )}
             </div>
-            {targetOrder && (
+            {currentPO && (
               <DialogDescription className="text-xs text-slate-400">
-                Sản phẩm: <span className="text-slate-200 font-medium">{targetOrder.productCode}</span> • {targetOrder.type || "Đóng gói tiêu chuẩn"}
+                {currentPO.productCode ? (
+                  <>
+                    Sản phẩm:{" "}
+                    <span className="text-slate-200 font-medium">
+                      {currentPO.productCode}
+                    </span>{" "}
+                    •{" "}
+                  </>
+                ) : null}
+                {currentPO.type || "Đóng gói tiêu chuẩn"}
               </DialogDescription>
             )}
           </DialogHeader>
@@ -1126,27 +1121,28 @@ export default function CameraPage({
       )}
 
       {/* Dialog xác nhận PO đã phát hiện (Confirm detected PO) */}
-      {detectedPO && capturedImage && (
+      {currentPO && capturedImage && (
         <ConfirmPODialog
           open={flowStep === "confirm-po"}
-          detectedPO={detectedPO}
+          detectedPO={currentPO}
           capturedImage={capturedImage}
           samplePhotoUrl={samplePhotoUrl || undefined}
-          stepNotes={activeStepItem?.notes}
+          stepNotes={currentPO?.notes}
           codeMeta={detectedCodeMeta}
+          poValidation={poValidation}
           onConfirm={handleConfirmPO}
           onRetake={handleRetake}
         />
       )}
 
       {/* Dialog kết quả upload ảnh + ảnh mẫu đối chiếu (Show message + template img) */}
-      {detectedPO && apiResult && capturedImage && (
+      {currentPO && apiResult && capturedImage && (
         <PhotoResultDialog
           open={flowStep === "result"}
           success={apiResult.success}
           message={apiResult.message}
           capturedImage={capturedImage}
-          detectedPO={detectedPO}
+          detectedPO={currentPO}
           samplePhotoUrl={samplePhotoUrl || undefined}
           onConfirmOK={handleConfirmResult}
           onRetake={handleRetake}
@@ -1155,10 +1151,10 @@ export default function CameraPage({
       )}
 
       {/* Dialog thông báo hoàn tất thành công (Notify result) */}
-      {detectedPO && confirmResult && (
+      {currentPO && confirmResult && (
         <NotifyResultDialog
           open={flowStep === "done"}
-          detectedPO={detectedPO}
+          detectedPO={currentPO}
           message={confirmResult.message}
           confirmResult={confirmResult}
           onBackToList={handleClose}

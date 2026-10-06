@@ -324,8 +324,8 @@ useEffect(() => {
         canvas.height = video.videoHeight
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-        // b. Quét mã trên canvas
-        const scanResult = await scanBarcodeFromCanvas(canvas, "both")
+        // b. Quét mã trên canvas (Barcode 1D & QR Code 2D)
+        const scanResult = await scanBarcodeFromCanvas(canvas)
 
         if (scanResult && scanResult.text.trim()) {
           // c. Kiểm tra cooldown (tránh spam lỗi)
@@ -617,21 +617,21 @@ const handleCapture = () => {
   setCapturedImage(dataUrl)
 
   // 6. Tiến hành quét mã trên ảnh vừa chụp
-  processQRCode(canvas)
+  processScannedCode(canvas)
 }
 ```
 
-### 5.7. Hàm `processQRCode()` — Quét mã trên ảnh chụp
+### 5.7. Hàm `processScannedCode()` — Quét mã trên ảnh chụp
 
 ```typescript
-const processQRCode = (canvas: HTMLCanvasElement) => {
+const processScannedCode = (canvas: HTMLCanvasElement) => {
   setFlowStep("scanning")      // Chuyển sang bước "đang quét"
   setScanErrorMessage(null)
 
   // Đợi 700ms để hiển thị hiệu ứng laser quét mã sinh động
   setTimeout(async () => {
     // 1. Quét mã trên canvas (cả Barcode 1D và QR Code 2D)
-    const scanResult = await scanBarcodeFromCanvas(canvas, "both")
+    const scanResult = await scanBarcodeFromCanvas(canvas)
 
     if (scanResult?.text?.trim()) {
       // 2. Xử lý theo quy tắc nghiệp vụ
@@ -732,7 +732,7 @@ const handleContinueNextStep = () => {
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ scanBarcodeFromCanvas(canvas, mode)                 │
+│ scanBarcodeFromCanvas(canvas)                       │
 │                                                     │
 │  Lớp 1: BarcodeDetector (native trình duyệt)       │
 │  ↓ Nếu thất bại                                    │
@@ -744,10 +744,7 @@ const handleContinueNextStep = () => {
 └─────────────────────────────────────────────────────┘
 ```
 
-**Tham số `mode`**:
-- `"both"` — quét tất cả (Barcode 1D + QR Code 2D), **đây là chế độ duy nhất hiện tại**
-- `"barcode"` — chỉ quét mã vạch sọc 1D
-- `"qrcode"` — chỉ quét mã vuông QR 2D
+Hệ thống tự động quét nhận diện đồng thời cả **Barcode 1D** và **QR Code 2D** trên cùng một khung hình hoặc ảnh chụp.
 
 ### 6.2. `poLookup.ts` — Xử lý mã + kiểm tra hợp lệ
 

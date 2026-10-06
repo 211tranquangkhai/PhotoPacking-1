@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "backend": "dotnet run --project Backend_API/PhotoPacking_Backend/PhotoPacking_Backend/PhotoPacking_Backend.csproj --urls http://localhost:5108",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"

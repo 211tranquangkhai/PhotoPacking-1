@@ -2,52 +2,46 @@ import { useState } from "react"
 import OrderListPage from "@/pages/OrderListPage"
 import CameraPage from "@/pages/CameraPage"
 import ScanPage from "@/pages/ScanPage"
-import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
 
 /**
- * App Component - Điều phối giữa Trang Danh sách Đơn hàng và Trang Chụp ảnh Camera
+ * App Component - Điều phối giữa Trang Danh sách Đơn hàng, Trang Quét mã và Trang Chụp ảnh Camera
  */
 export default function App() {
   const [view, setView] = useState<"orders" | "camera" | "scan">("orders")
-  const [targetOrder, setTargetOrder] = useState<PhotoPackingSummary | null>(null)
-  const [scannedPO, setScannedPO] = useState<PhotoPackingSummary | null>(null)
+  const [activePO, setActivePO] = useState<string | null>(null)
 
   const [scannedCodeMeta, setScannedCodeMeta] = useState<{
     format?: string
     codeType?: "barcode" | "qrcode"
   } | null>(null)
 
-  // Mở camera để chụp hoặc chụp lại cho một đơn hàng cụ thể
-  const handleOpenOrderCamera = (order: PhotoPackingSummary) => {
-    setTargetOrder(order)
-    setScannedPO(null)
+  // Mở camera từ danh sách đơn hàng cho một PO cụ thể
+  const handleOpenOrderCamera = (po: string) => {
+    setActivePO(po)
     setScannedCodeMeta(null)
     setView("camera")
   }
 
-  // Mở Scan View (từ nút quét barcode trên search hoặc FAB camera)
+  // Mở Scan View (từ nút quét barcode trên thanh tìm kiếm hoặc nút nổi)
   const handleOpenScanCamera = () => {
-    setTargetOrder(null)
-    setScannedPO(null)
+    setActivePO(null)
     setScannedCodeMeta(null)
     setView("scan")
   }
 
-  // PO được phát hiện từ Scan View → chuyển sang Camera View kèm PO data và loại mã
+  // PO được phát hiện từ Scan View → chuyển sang Camera View kèm PO (chuỗi 12 số) và loại mã
   const handlePODetected = (
-    po: PhotoPackingSummary,
+    po: string,
     codeMeta?: { format?: string; codeType?: "barcode" | "qrcode" }
   ) => {
-    setScannedPO(po)
+    setActivePO(po)
     setScannedCodeMeta(codeMeta || null)
-    setTargetOrder(null)
     setView("camera")
   }
 
   // Quay lại trang danh sách đơn hàng
   const handleBackToOrders = () => {
-    setTargetOrder(null)
-    setScannedPO(null)
+    setActivePO(null)
     setScannedCodeMeta(null)
     setView("orders")
   }
@@ -61,11 +55,10 @@ export default function App() {
     )
   }
 
-  if (view === "camera") {
+  if (view === "camera" && activePO) {
     return (
       <CameraPage
-        targetOrder={targetOrder}
-        scannedPO={scannedPO}
+        po={activePO}
         scannedCodeMeta={scannedCodeMeta}
         onBack={handleBackToOrders}
       />

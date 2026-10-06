@@ -1,13 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from "react"
-import { X, ScanLine, Layers, AlertCircle } from "lucide-react"
+import { X, ScanLine, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { processScannedBarcodeResult } from "@/services/poLookup"
 import { scanBarcodeFromCanvas } from "@/services/barcodeScanner"
-import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
-
 interface ScanPageProps {
   onPODetected: (
-    po: PhotoPackingSummary,
+    po: string,
     codeMeta?: { format?: string; codeType?: "barcode" | "qrcode" }
   ) => void
   onBack: () => void
@@ -15,7 +13,7 @@ interface ScanPageProps {
 
 /**
  * Trang quét mã vạch Barcode (1D) & QR Code (2D) real-time
- * Chế độ duy nhất: Đọc cả hai (Both).
+ * Tự động nhận diện cả 2 loại mã.
  * Bắt mã đầu tiên phát hiện được; nếu là QR Code sẽ tách chuỗi theo dấu ";" và lấy PO là phần đầu.
  * Nếu PO không phải chuỗi 12 ký tự số thì trả lỗi.
  */
@@ -127,8 +125,8 @@ export default function ScanPage({ onPODetected, onBack }: ScanPageProps) {
 
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-            // Luôn quét đồng thời cả Barcode 1D và QR Code 2D ("both")
-            const scanResult = await scanBarcodeFromCanvas(canvas, "both")
+            // Quét mã Barcode 1D & QR Code 2D
+            const scanResult = await scanBarcodeFromCanvas(canvas)
 
             if (scanResult && scanResult.text.trim()) {
               // Nếu đang trong thời gian cooldown sau khi báo lỗi thì bỏ qua frame này
@@ -149,16 +147,16 @@ export default function ScanPage({ onPODetected, onBack }: ScanPageProps) {
               }
 
               // Mã hợp lệ: Đã tìm thấy PO thành công
-              const po = processed.poSummary!
+              const poCode = (processed.poCode || processed.poSummary?.pO || scanResult.text.trim())
               isDetectedRef.current = true
               setIsDetected(true)
               const tagLabel =
                 processed.codeType === "qrcode"
                   ? "QR Code"
                   : processed.format || "Barcode"
-              setDetectedMessage(`Đã nhận diện [${tagLabel}]: PO ${po.pO}`)
+              setDetectedMessage(`Đã nhận diện [${tagLabel}]: PO ${poCode}`)
               setTimeout(() => {
-                onPODetectedRef.current(po, {
+                onPODetectedRef.current(poCode, {
                   format: processed.format,
                   codeType: processed.codeType,
                 })
@@ -199,9 +197,8 @@ export default function ScanPage({ onPODetected, onBack }: ScanPageProps) {
 
       {/* Header */}
       <header className="z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/85 via-black/50 to-transparent">
-        <div className="size-10 flex items-center justify-center">
-          <Layers className="w-5 h-5 text-emerald-400" />
-        </div>
+        {/* Spacer để căn giữa tiêu đề cân đối với nút đóng bên phải */}
+        <div className="size-10" />
         <div className="flex flex-col items-center">
           <div className="flex items-center gap-1.5">
             <ScanLine className="w-4 h-4 text-cyan-400 animate-pulse" />

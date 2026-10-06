@@ -66,7 +66,7 @@ Khác với `useState`, các giá trị trong `useRef` khi thay đổi **không 
 * **Nơi sử dụng:**
   * Thiết lập kích thước trùng với video: `canvas.width = video.videoWidth`, `canvas.height = video.videoHeight` (dòng 123-124).
   * Lấy 2D context: `canvas.getContext("2d", { willReadFrequently: true })` (dòng 125).
-  * Truyền vào engine quét: `scanBarcodeFromCanvas(canvas, "both")` (dòng 131).
+  * Truyền vào engine quét: `scanBarcodeFromCanvas(canvas)` (dòng 131).
 
 #### 3. `streamRef`
 * **Kiểu dữ liệu:** `React.MutableRefObject<MediaStream | null>`
@@ -153,7 +153,7 @@ Khác với `useState`, các giá trị trong `useRef` khi thay đổi **không 
 * **Nhiệm vụ:**
   * Gọi `navigator.mediaDevices.getUserMedia` với cấu hình camera sau (`facingMode: "environment"`) độ phân giải Full HD (1080p).
   * Gán luồng vào `videoRef` và phát video.
-  * Khởi tạo vòng lặp timer 200ms `scanIntervalRef`. Mỗi 200ms trích xuất frame từ video sang `canvasRef`, gọi `scanBarcodeFromCanvas(canvas, "both")`.
+  * Khởi tạo vòng lặp timer 200ms `scanIntervalRef`. Mỗi 200ms trích xuất frame từ video sang `canvasRef`, gọi `scanBarcodeFromCanvas(canvas)`.
   * Phân tích kết quả qua `processScannedBarcodeResult`. Nếu hợp lệ, gán `isDetectedRef = true`, hiện nhãn thông báo và sau 500ms gọi `onPODetectedRef.current(po, codeMeta)`.
 
 ---
@@ -302,11 +302,11 @@ Từ điển cấu hình 3 mức độ phân giải:
   2. Áp dụng độ sáng & mức zoom số (nếu có).
   3. Đóng dấu thời gian watermark ở góc dưới bên phải theo định dạng `dd/MM/yyyy HH:mm`.
   4. Xuất ảnh ra Base64 JPEG (`setCapturedImage`).
-  5. Gọi hàm `processQRCode(canvas)`.
+  5. Gọi hàm `processScannedCode(canvas)`.
 * **`handleFileUpload(e)`** (Dòng 556-577): Dự phòng cho trường hợp không dùng được camera, cho phép người dùng chọn ảnh từ thư viện máy để đưa vào quy trình.
-* **`processQRCode(canvas)`** (Dòng 418-475):
+* **`processScannedCode(canvas)`** (Dòng 418-475):
   * Chuyển trạng thái sang `"scanning"` (hiện hiệu ứng laser quét mã 700ms).
-  * Gọi `scanBarcodeFromCanvas(canvas, "both")` để tìm barcode/QR trên ảnh chụp.
+  * Gọi `scanBarcodeFromCanvas(canvas)` để tìm barcode/QR trên ảnh chụp.
   * Nếu tìm thấy: kiểm tra mã hợp lệ, gán `detectedPO` và chuyển sang `"confirm-po"`.
   * Nếu không tìm thấy mã trong ảnh: dùng lại `scannedPO` hoặc `targetOrder` đã chọn sẵn làm fallback để không làm gián đoạn công nhân.
 * **`handleRetake()`** (Dòng 580-595): Hủy ảnh chụp hiện tại, xóa các kết quả lỗi, đưa máy về `"preview"` để chụp lại.
@@ -330,7 +330,7 @@ Từ điển cấu hình 3 mức độ phân giải:
 | `startCamera()` | 178 | Bất kỳ | Mở luồng video camera từ phần cứng trình duyệt |
 | `stopCamera()` | 253 | Bất kỳ | Tắt đèn camera, giải phóng tài nguyên phần cứng |
 | `handleCapture()` | 478 | `preview` ➔ `scanning` | Chụp frame, đóng dấu ngày giờ watermark, quét mã |
-| `processQRCode()` | 418 | `scanning` ➔ `confirm-po` | Nhận diện mã vạch trên ảnh, kích hoạt dialog xác nhận |
+| `processScannedCode()` | 418 | `scanning` ➔ `confirm-po` | Nhận diện mã vạch trên ảnh, kích hoạt dialog xác nhận |
 | `handleRetake()` | 580 | Bất kỳ ➔ `preview` | Hủy ảnh hiện tại, chụp lại từ đầu |
 | `handleConfirmPO()` | 598 | `confirm-po` ➔ `uploading` ➔ `result` | Gửi ảnh lên server lần 1 (`submitPhoto`) |
 | `handleConfirmResult()`| 626 | `result` ➔ `confirming` ➔ `done` | Xác nhận hoàn thành bước lần 2 (`confirmStep`) |
