@@ -1,74 +1,183 @@
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
+import ManagerHeader, { type ManagerNavTab } from "@/components/manager/ManagerHeader"
+import ManagerDashboard from "@/pages/manager/ManagerDashboard"
+import ManagerPhotoPage from "@/pages/manager/ManagerPhotoPage"
+import ManagerMasterPage from "@/pages/manager/ManagerMasterPage"
 import OrderListPage from "@/pages/OrderListPage"
 import CameraPage from "@/pages/CameraPage"
 import ScanPage from "@/pages/ScanPage"
+import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
+import {
+  DEFAULT_MANAGER_PROFILE,
+  INITIAL_SUMMARY_ORDERS,
+  loadManagerOrders,
+} from "@/services/managerService"
+import { ArrowLeft } from "lucide-react"
 
 /**
- * App Component - Điều phối giữa Trang Danh sách Đơn hàng, Trang Quét mã và Trang Chụp ảnh Camera
+ * App Component - Điều phối giao diện Quản lý (Manager Portal) & Chế độ Công nhân (Operator Mode)
  */
 export default function App() {
-  const [view, setView] = useState<"orders" | "camera" | "scan">("orders")
-  const [activePO, setActivePO] = useState<string | null>(null)
+  // Chế độ xem chính: "manager" (Mặc định cho Quản lý) | "operator" (Chế độ chụp ảnh máy quét)
+  const [appMode, setAppMode] = useState<"manager" | "operator">("manager")
 
+  // Tab điều hướng của Manager: "dashboard" | "photo" | "master-osa" | "master-lxa"
+  const [managerTab, setManagerTab] = useState<ManagerNavTab>("dashboard")
+  const [photoSubTab, setPhotoSubTab] = useState<"summary" | "detail">("summary")
+
+  // Dữ liệu đơn hàng PO
+  const [orders, setOrders] = useState<PhotoPackingSummary[]>(INITIAL_SUMMARY_ORDERS)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Tải danh sách đơn hàng từ Backend API hoặc Fallback
+  const refreshOrders = useCallback(async () => {
+    setIsRefreshing(true)
+    try {
+      const data = await loadManagerOrders()
+      setOrders(data)
+    } catch (error) {
+      console.warn("Lỗi khi làm mới đơn hàng:", error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshOrders()
+  }, [refreshOrders])
+
+  // Điều hướng từ Dashboard sang Photo
+  const handleNavigateToPhoto = (tab: "summary" | "detail" = "summary") => {
+    setPhotoSubTab(tab)
+    setManagerTab("photo")
+  }
+
+  // Điều hướng từ Dashboard sang Master
+  const handleNavigateToMaster = (group: "OSA" | "LXA") => {
+    setManagerTab(group === "OSA" ? "master-osa" : "master-lxa")
+  }
+
+  // ================= State cho Chế độ Công nhân (Operator) =================
+  const [operatorView, setOperatorView] = useState<"orders" | "camera" | "scan">("orders")
+  const [activePO, setActivePO] = useState<string | null>(null)
   const [scannedCodeMeta, setScannedCodeMeta] = useState<{
     format?: string
     codeType?: "barcode" | "qrcode"
   } | null>(null)
 
-  // Mở camera từ danh sách đơn hàng cho một PO cụ thể
   const handleOpenOrderCamera = (po: string) => {
     setActivePO(po)
     setScannedCodeMeta(null)
-    setView("camera")
+    setOperatorView("camera")
   }
 
-  // Mở Scan View (từ nút quét barcode trên thanh tìm kiếm hoặc nút nổi)
   const handleOpenScanCamera = () => {
     setActivePO(null)
     setScannedCodeMeta(null)
-    setView("scan")
+    setOperatorView("scan")
   }
 
-  // PO được phát hiện từ Scan View → chuyển sang Camera View kèm PO (chuỗi 12 số) và loại mã
   const handlePODetected = (
     po: string,
     codeMeta?: { format?: string; codeType?: "barcode" | "qrcode" }
   ) => {
     setActivePO(po)
     setScannedCodeMeta(codeMeta || null)
-    setView("camera")
+    setOperatorView("camera")
   }
 
-  // Quay lại trang danh sách đơn hàng
   const handleBackToOrders = () => {
     setActivePO(null)
     setScannedCodeMeta(null)
-    setView("orders")
+    setOperatorView("orders")
   }
 
-  if (view === "scan") {
+  // ================= RENDER OPERATOR MODE =================
+  if (appMode === "operator") {
     return (
-      <ScanPage
-        onPODetected={handlePODetected}
-        onBack={handleBackToOrders}
-      />
+      <div className="min-h-screen bg-slate-100 flex flex-col">
+        {/* Thanh bar quay lại chế độ Manager */}
+        <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between text-xs sticky top-0 z-50 shadow-md">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-semibold">Đang ở Chế độ Nhân viên Thao tác (Operator Mode)</span>
+          </div>
+          <button
+            onClick={() => setAppMode("manager")}
+            className="flex items-center gap-1.5 rounded-md bg-blue-600 hover:bg-blue-700 px-3 py-1 font-bold text-white transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Quay lại Giao diện Quản lý (Manager)</span>
+          </button>
+        </div>
+
+        <div className="flex-1">
+          {operatorView === "scan" ? (
+            <ScanPage onPODetected={handlePODetected} onBack={handleBackToOrders} />
+          ) : operatorView === "camera" && activePO ? (
+            <CameraPage
+              po={activePO}
+              scannedCodeMeta={scannedCodeMeta}
+              onBack={handleBackToOrders}
+            />
+          ) : (
+            <OrderListPage
+              onOpenOrderCamera={handleOpenOrderCamera}
+              onOpenScanCamera={handleOpenScanCamera}
+            />
+          )}
+        </div>
+      </div>
     )
   }
 
-  if (view === "camera" && activePO) {
-    return (
-      <CameraPage
-        po={activePO}
-        scannedCodeMeta={scannedCodeMeta}
-        onBack={handleBackToOrders}
-      />
-    )
-  }
-
+  // ================= RENDER MANAGER MODE =================
   return (
-    <OrderListPage
-      onOpenOrderCamera={handleOpenOrderCamera}
-      onOpenScanCamera={handleOpenScanCamera}
-    />
+    <div className="min-h-screen bg-slate-50/70 text-slate-900 antialiased font-sans flex flex-col selection:bg-blue-500 selection:text-white">
+      {/* 1. Header bao gồm Logo Photo Packing, menu ngang (Dashboard, Photo, Master) & Profile Manager không avatar */}
+      <ManagerHeader
+        currentTab={managerTab}
+        onSelectTab={(tab) => {
+          setManagerTab(tab)
+          if (tab === "photo") {
+            setPhotoSubTab("summary")
+          }
+        }}
+        profile={DEFAULT_MANAGER_PROFILE}
+        onSwitchToOperator={() => setAppMode("operator")}
+        onRefreshAll={refreshOrders}
+        isRefreshing={isRefreshing}
+      />
+
+      {/* 2. Main Content Body */}
+      <main className="mx-auto w-full max-w-[98%] flex-1 px-3 sm:px-4 lg:px-6 pt-5">
+        {/* Trang 1: Dashboard (Số liệu tổng quát, đơn chưa chụp, đã chụp, tỷ lệ hoàn tất) */}
+        {managerTab === "dashboard" && (
+          <ManagerDashboard
+            orders={orders}
+            onNavigateToPhoto={handleNavigateToPhoto}
+            onNavigateToMaster={handleNavigateToMaster}
+          />
+        )}
+
+        {/* Trang 2: Photo (2 tab Summary và Detail theo dạng bảng) */}
+        {managerTab === "photo" && (
+          <ManagerPhotoPage
+            orders={orders}
+            initialTab={photoSubTab}
+          />
+        )}
+
+        {/* Trang 3: Master - Navi OSA */}
+        {managerTab === "master-osa" && (
+          <ManagerMasterPage group="OSA" />
+        )}
+
+        {/* Trang 3: Master - Navi LXA */}
+        {managerTab === "master-lxa" && (
+          <ManagerMasterPage group="LXA" />
+        )}
+      </main>
+    </div>
   )
 }
