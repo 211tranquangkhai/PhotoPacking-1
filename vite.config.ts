@@ -22,6 +22,11 @@ export default defineConfig({
       '/Image': {
         target: 'http://localhost:5108',
         changeOrigin: true,
+        bypass: (req) => {
+          if (req.url?.startsWith('/Image/Template')) {
+            return req.url
+          }
+        },
       },
     },
   },

@@ -24,12 +24,6 @@ export default function OrderPhotoGalleryModal({
   initialStep = 1,
   onClose,
 }: OrderPhotoGalleryModalProps) {
-  if (!order) return null
-
-  const totalStep = order.totalStep || 2
-  const currentStep = order.currentStep || 0
-  const photos = order.photoUrls || []
-
   // Bước đang được chọn xem trong danh sách (mặc định theo initialStep)
   const [selectedStep, setSelectedStep] = useState<number>(initialStep || 1)
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
@@ -39,6 +33,12 @@ export default function OrderPhotoGalleryModal({
       setSelectedStep(initialStep)
     }
   }, [initialStep, order])
+
+  if (!order) return null
+
+  const totalStep = order.totalStep || 2
+  const currentStep = order.currentStep || 0
+  const photos = order.photoUrls || []
 
   // Danh sách các bước của đơn hàng
   const stepItems = Array.from({ length: totalStep }, (_, index) => {

@@ -436,7 +436,7 @@ export default function ManagerPhotoPage({
                               setSelectedGalleryStep(1)
                             }}
                             title="Xem tất cả ảnh PO"
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold px-3.5 py-1.5 shadow-xs transition-all cursor-pointer"
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-blue-200 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 active:scale-95 transition-all cursor-pointer"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
@@ -602,7 +602,7 @@ export default function ManagerPhotoPage({
                             type="button"
                             title="Xem ảnh"
                             onClick={() => handleOpenStepPhoto(detail)}
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-xs transition-all cursor-pointer"
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-blue-200 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 active:scale-95 transition-all cursor-pointer"
                           >
                             <Eye className="h-4 w-4" />
                           </button>

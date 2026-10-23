@@ -108,9 +108,6 @@ export default function ManagerHeader({
             >
               <Images className="h-4 w-4" />
               <span>Photo</span>
-              <span className="inline-flex items-center rounded-full bg-slate-200/80 px-2 py-0.5 text-[11px] font-medium text-slate-700">
-                Summary & Detail
-              </span>
             </button>
 
             {/* Tab: Master (Dropdown với Navi OSA & Navi LXA) */}

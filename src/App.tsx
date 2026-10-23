@@ -3,6 +3,7 @@ import ManagerHeader, { type ManagerNavTab } from "@/components/manager/ManagerH
 import ManagerDashboard from "@/pages/manager/ManagerDashboard"
 import ManagerPhotoPage from "@/pages/manager/ManagerPhotoPage"
 import ManagerMasterPage from "@/pages/manager/ManagerMasterPage"
+import MasterNaviOSAPage from "@/pages/manager/MasterNaviOSAPage"
 import OrderListPage from "@/pages/OrderListPage"
 import CameraPage from "@/pages/CameraPage"
 import ScanPage from "@/pages/ScanPage"
@@ -168,9 +169,9 @@ export default function App() {
           />
         )}
 
-        {/* Trang 3: Master - Navi OSA */}
+        {/* Trang 3: Master - Navi OSA (Giao diện CRUD dạng bảng với NaviOSA) */}
         {managerTab === "master-osa" && (
-          <ManagerMasterPage group="OSA" />
+          <MasterNaviOSAPage />
         )}
 
         {/* Trang 3: Master - Navi LXA */}

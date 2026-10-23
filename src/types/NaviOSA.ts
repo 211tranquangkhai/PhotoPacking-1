@@ -1,12 +1,12 @@
-export interface NavIOSA {
+export interface NaviOSA {
     id: number;
-    product: string;
-    productName?: string;
-    step: number;
-    stepTitle?: string;
+    productKey: string;
+    stepNo: number;
+    group: string
     imagePath: string;
-    standardDescription?: string;
-    group?: "OSA" | "LXA";
-    updatedBy?: string;
+    notes: string;
+    creator: string;
+    createdTime: string;
+    updater?: string;
     updatedTime?: string;
 }

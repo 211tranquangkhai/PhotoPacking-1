@@ -20,6 +20,8 @@ import {
   resetMasterTemplates,
 } from "@/services/managerService"
 
+import MasterNaviOSAPage from "./MasterNaviOSAPage"
+
 interface ManagerMasterPageProps {
   group: "OSA" | "LXA"
 }
@@ -34,7 +36,7 @@ const AVAILABLE_TEMPLATES = [
   { name: "SI (Cụm linh kiện chuẩn)", url: "/Image/Template/SI.jpg" },
 ]
 
-export default function ManagerMasterPage({ group }: ManagerMasterPageProps) {
+function ManagerMasterContent({ group }: ManagerMasterPageProps) {
   // Danh sách templates của xưởng
   const [templates, setTemplates] = useState<MasterStepTemplate[]>([])
   const [searchQuery, setSearchQuery] = useState("")
@@ -613,4 +615,11 @@ export default function ManagerMasterPage({ group }: ManagerMasterPageProps) {
       )}
     </div>
   )
+}
+
+export default function ManagerMasterPage({ group }: ManagerMasterPageProps) {
+  if (group === "OSA") {
+    return <MasterNaviOSAPage />
+  }
+  return <ManagerMasterContent group={group} />
 }
