@@ -23,8 +23,8 @@ export default function App() {
   const [appMode, setAppMode] = useState<"manager" | "operator">("manager")
 
   // Tab điều hướng của Manager: "dashboard" | "photo" | "master-osa" | "master-lxa"
-  const [managerTab, setManagerTab] = useState<ManagerNavTab>("dashboard")
-  const [photoSubTab, setPhotoSubTab] = useState<"summary" | "detail">("summary")
+  const [managerTab, setManagerTab] = useState<ManagerNavTab>("photo")
+  const [photoSubTab, setPhotoSubTab] = useState<"summary" | "detail">("detail")
 
   // Dữ liệu đơn hàng PO
   const [orders, setOrders] = useState<PhotoPackingSummary[]>(INITIAL_SUMMARY_ORDERS)
@@ -48,7 +48,7 @@ export default function App() {
   }, [refreshOrders])
 
   // Điều hướng từ Dashboard sang Photo
-  const handleNavigateToPhoto = (tab: "summary" | "detail" = "summary") => {
+  const handleNavigateToPhoto = (tab: "summary" | "detail" = "detail") => {
     setPhotoSubTab(tab)
     setManagerTab("photo")
   }
@@ -101,7 +101,7 @@ export default function App() {
         <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between text-xs sticky top-0 z-50 shadow-md">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-semibold">Đang ở Chế độ Nhân viên Thao tác (Operator Mode)</span>
+            <span className="font-semibold">Đang ở Chế độ Nhân viên Thao tác (Mobile Mode)</span>
           </div>
           <button
             onClick={() => setAppMode("manager")}
@@ -141,7 +141,7 @@ export default function App() {
         onSelectTab={(tab) => {
           setManagerTab(tab)
           if (tab === "photo") {
-            setPhotoSubTab("summary")
+            setPhotoSubTab("detail")
           }
         }}
         profile={DEFAULT_MANAGER_PROFILE}

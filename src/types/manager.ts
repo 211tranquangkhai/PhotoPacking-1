@@ -54,8 +54,7 @@ export interface DashboardMetrics {
  * Profile của Quản lý (Manager)
  */
 export interface ManagerProfile {
-  employeeId: string // Mã nhân viên
-  fullName: string   // Tên quản lý
-  role: string       // Chức danh
-  department: string // Bộ phận
+  employeeId: string 
+  fullName: string   
+  role: string       
 }
