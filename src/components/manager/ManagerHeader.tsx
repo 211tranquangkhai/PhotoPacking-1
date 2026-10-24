@@ -69,7 +69,7 @@ export default function ManagerHeader({
                 Photo Packing
               </span>
               <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                Hệ thống Quản lý Đóng gói
+                App Quản lý Ảnh Đóng gói
               </span>
             </div>
           </div>
@@ -246,7 +246,7 @@ export default function ManagerHeader({
               className="hidden xl:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
             >
               <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
-              <span>Chế độ Chụp ảnh (Operator)</span>
+              <span>Chế độ Chụp ảnh (Mobile)</span>
             </button>
           )}
 
@@ -255,7 +255,7 @@ export default function ManagerHeader({
             id="manager-profile-box"
             className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-1.5 shadow-2xs"
           >
-            <div className="flex flex-col text-right">
+            <div className="flex flex-col text-left">
               <span className="text-xs font-bold text-slate-900 tracking-tight">
                 {profile.fullName}
               </span>
@@ -264,7 +264,7 @@ export default function ManagerHeader({
                   {profile.employeeId}
                 </span>
                 <span className="text-[11px] text-slate-500 font-medium">
-                  Manager
+                  {profile.role}
                 </span>
               </div>
             </div>

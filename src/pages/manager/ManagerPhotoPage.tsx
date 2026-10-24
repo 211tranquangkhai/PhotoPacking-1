@@ -24,7 +24,7 @@ interface ManagerPhotoPageProps {
 
 export default function ManagerPhotoPage({
   orders,
-  initialTab = "summary",
+  initialTab = "detail",
 }: ManagerPhotoPageProps) {
   // Quản lý tab: "summary" (PhotoPackingSummary) | "detail" (Chi tiết từng bước)
   const [activeTab, setActiveTab] = useState<"summary" | "detail">(initialTab)
@@ -220,11 +220,7 @@ export default function ManagerPhotoPage({
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            placeholder={
-              activeTab === "summary"
-                ? "Tìm theo số PO, mã/tên sản phẩm, người chụp..."
-                : "Tìm theo số PO, bước chụp, người chụp..."
-            }
+            placeholder="Nhập số PO"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-10 pr-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20"
@@ -308,11 +304,11 @@ export default function ManagerPhotoPage({
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
                   <th className="py-3.5 pl-4 pr-3">PO</th>
-                  <th className="py-3.5 px-3">Thông tin Sản phẩm</th>
-                  <th className="py-3.5 px-3">Loại (Type)</th>
-                  <th className="py-3.5 px-3">Người chụp / Tạo</th>
+                  <th className="py-3.5 px-3">Product</th>
+                  <th className="py-3.5 px-3">Type</th>
+                  <th className="py-3.5 px-3">NV Packing</th>
                   <th className="py-3.5 px-3">Thời gian chụp</th>
-                  <th className="py-3.5 px-3">Tiến độ bước</th>
+                  <th className="py-3.5 px-3">Tiến độ</th>
                   <th className="py-3.5 px-3">Trạng thái</th>
                   <th className="py-3.5 pr-4 pl-3 text-center">Thao tác</th>
                 </tr>
@@ -324,7 +320,7 @@ export default function ManagerPhotoPage({
                       <Images className="h-10 w-10 mx-auto text-slate-300 mb-2" />
                       <p className="font-semibold text-slate-600">Không tìm thấy đơn hàng nào</p>
                       <p className="text-xs text-slate-400 mt-1">
-                        Hãy thử thay đổi từ khóa tìm kiếm hoặc điều chỉnh bộ lọc
+                        Thử thay đổi từ khóa tìm kiếm hoặc điều chỉnh bộ lọc
                       </p>
                     </td>
                   </tr>
@@ -481,12 +477,11 @@ export default function ManagerPhotoPage({
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
                   <th className="py-3.5 pl-4 pr-3">PO</th>
                   <th className="py-3.5 px-3">Tên sản phẩm</th>
-                  <th className="py-3.5 px-3 font-extrabold text-blue-700">Bước chụp</th>
-                  <th className="py-3.5 px-3">Tên bước kiểm tra</th>
+                  <th className="py-3.5 px-3 font-extrabold text-slate-900">Bước</th>
                   <th className="py-3.5 px-3 font-extrabold text-slate-900">Người chụp</th>
                   <th className="py-3.5 px-3 font-extrabold text-slate-900">Thời gian chụp</th>
-                  <th className="py-3.5 px-3">Trạng thái bước</th>
-                  <th className="py-3.5 px-3">Ghi chú kiểm tra</th>
+                  <th className="py-3.5 px-3">Trạng thái</th>
+                  <th className="py-3.5 px-3">Notes</th>
                   <th className="py-3.5 pr-4 pl-3 text-center">Thao tác</th>
                 </tr>
               </thead>
@@ -540,11 +535,6 @@ export default function ManagerPhotoPage({
                           >
                             Bước {detail.stepNumber}
                           </button>
-                        </td>
-
-                        {/* Tên bước kiểm tra */}
-                        <td className="py-3.5 px-3 min-w-44 font-medium text-slate-700">
-                          {detail.stepTitle}
                         </td>
 
                         {/* Người chụp (Highlight theo yêu cầu) */}
