@@ -381,7 +381,7 @@ export default function App() {
           <ManagerPhotoPage
             orders={orders}
             userGroup={userGroup}
-            isLoadingOrders={isRefreshing && orders.length === 0}
+            isLoadingOrders={isRefreshing}
             initialTab={photoSubTab}
             onRefresh={refreshOrders}
           />

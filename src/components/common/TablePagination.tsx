@@ -12,6 +12,7 @@ export interface TablePaginationProps {
   onPageChange: (page: number) => void
   itemLabel?: string
   className?: string
+  disabled?: boolean
 }
 
 export default function TablePagination({
@@ -21,6 +22,7 @@ export default function TablePagination({
   onPageChange,
   itemLabel = "bản ghi",
   className = "",
+  disabled = false,
 }: TablePaginationProps) {
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
@@ -70,7 +72,7 @@ export default function TablePagination({
         <button
           type="button"
           onClick={() => onPageChange(1)}
-          disabled={safeCurrentPage <= 1}
+          disabled={disabled || safeCurrentPage <= 1}
           title="Trang đầu"
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900 hover:border-slate-300 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:cursor-not-allowed cursor-pointer active:scale-95 shadow-2xs"
         >
@@ -81,7 +83,7 @@ export default function TablePagination({
         <button
           type="button"
           onClick={() => onPageChange(safeCurrentPage - 1)}
-          disabled={safeCurrentPage <= 1}
+          disabled={disabled || safeCurrentPage <= 1}
           title="Trang trước"
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900 hover:border-slate-300 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:cursor-not-allowed cursor-pointer active:scale-95 shadow-2xs"
         >
@@ -110,8 +112,9 @@ export default function TablePagination({
                 key={pageNum}
                 type="button"
                 onClick={() => onPageChange(pageNum)}
+                disabled={disabled}
                 aria-current={isActive ? "page" : undefined}
-                className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold transition-all cursor-pointer select-none active:scale-95 ${
+                className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold transition-all cursor-pointer select-none active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
                   isActive
                     ? "bg-blue-600 text-white shadow-xs border border-blue-600"
                     : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 hover:border-slate-300 shadow-2xs"
@@ -127,7 +130,7 @@ export default function TablePagination({
         <button
           type="button"
           onClick={() => onPageChange(safeCurrentPage + 1)}
-          disabled={safeCurrentPage >= totalPages}
+          disabled={disabled || safeCurrentPage >= totalPages}
           title="Trang sau"
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900 hover:border-slate-300 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:cursor-not-allowed cursor-pointer active:scale-95 shadow-2xs"
         >
@@ -138,7 +141,7 @@ export default function TablePagination({
         <button
           type="button"
           onClick={() => onPageChange(totalPages)}
-          disabled={safeCurrentPage >= totalPages}
+          disabled={disabled || safeCurrentPage >= totalPages}
           title="Trang cuối"
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900 hover:border-slate-300 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:cursor-not-allowed cursor-pointer active:scale-95 shadow-2xs"
         >

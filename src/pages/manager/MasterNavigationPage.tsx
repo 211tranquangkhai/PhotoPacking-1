@@ -19,6 +19,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCw,
+  Loader2,
 } from "lucide-react"
 import type { PhotoPackingMasterNavigation, User as UserType } from "@/types"
 import {
@@ -73,12 +74,14 @@ export default function MasterNavigationPage({
   const [viewingItem, setViewingItem] = useState<PhotoPackingMasterNavigation | null>(null)
   const [imageZoom, setImageZoom] = useState<number>(1)
   const [imageRotation, setImageRotation] = useState<number>(0)
+  const [isViewingImageLoading, setIsViewingImageLoading] = useState<boolean>(true)
 
   // Đặt lại zoom và góc xoay về mặc định khi mở modal hoặc đổi ảnh xem
   useEffect(() => {
     if (viewingItem) {
       setImageZoom(1)
       setImageRotation(0)
+      setIsViewingImageLoading(true)
     }
   }, [viewingItem])
 
@@ -552,17 +555,32 @@ export default function MasterNavigationPage({
 
               {/* Khung chứa ảnh mẫu lớn với zoom và xoay */}
               <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                {isViewingImageLoading && (
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur-xs transition-opacity duration-200">
+                    <div className="relative flex items-center justify-center">
+                      <div className="h-12 w-12 rounded-full border-2 border-blue-500/20 border-t-blue-500 animate-spin" />
+                      <Loader2 className="absolute h-5 w-5 text-blue-400 animate-spin" />
+                    </div>
+                    <span className="mt-3 text-xs font-semibold text-slate-300 tracking-wide animate-pulse">
+                      Đang tải ảnh mẫu...
+                    </span>
+                  </div>
+                )}
                 <img
                   src={viewingItem.templatePath}
                   alt={`Mẫu ${viewingItem.productKey} - Bước ${viewingItem.stepNo}`}
+                  onLoad={() => setIsViewingImageLoading(false)}
+                  onError={(e) => {
+                    setIsViewingImageLoading(false)
+                    ;(e.target as HTMLImageElement).src = "/Image/Template/Tray.jpg"
+                  }}
                   style={{
                     transform: `scale(${imageZoom}) rotate(${imageRotation}deg)`,
                     transition: "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                   }}
-                  className="max-h-full max-w-full object-contain rounded-xl shadow-2xl select-none"
-                  onError={(e) => {
-                    ;(e.target as HTMLImageElement).src = "/Image/Template/Tray.jpg"
-                  }}
+                  className={`max-h-full max-w-full object-contain rounded-xl shadow-2xl select-none transition-opacity duration-300 ${
+                    isViewingImageLoading ? "opacity-0" : "opacity-100"
+                  }`}
                 />
               </div>
 

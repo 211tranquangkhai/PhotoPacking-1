@@ -20,11 +20,13 @@ import {
   RotateCw,
   Package,
   Flame,
+  Loader2,
 } from "lucide-react"
 import type { PhotoPackingSummary, OrderStepDetail } from "@/types"
 import { generateStepDetailsFromOrders } from "@/services/managerService"
 import { fetchPhotoPackingItems } from "@/services/photoPackingItemService"
 import OrderPhotoGalleryModal from "@/components/manager/OrderPhotoGalleryModal"
+import AllPhotosGalleryModal from "@/components/manager/AllPhotosGalleryModal"
 import TablePagination from "@/components/common/TablePagination"
 
 interface ManagerPhotoPageProps {
@@ -96,6 +98,10 @@ export default function ManagerPhotoPage({
     useState<PhotoPackingSummary | null>(null)
   const [selectedGalleryStep, setSelectedGalleryStep] = useState<number>(1)
 
+  // Modal Xem tất cả ảnh (theo bố cục Master Navigation có Carousel Prev/Next)
+  const [isAllPhotosModalOpen, setIsAllPhotosModalOpen] = useState<boolean>(false)
+  const [allPhotosInitialIndex, setAllPhotosInitialIndex] = useState<number>(0)
+
   // Mở modal xem ảnh cho một bước cụ thể trong Tab Detail
   const handleOpenStepPhoto = (detail: OrderStepDetail) => {
     const parent = orders.find((o) => o.pO === detail.poNumber)
@@ -127,6 +133,9 @@ export default function ManagerPhotoPage({
   const [apiStepDetails, setApiStepDetails] = useState<OrderStepDetail[]>([])
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(true)
   const [detailsError, setDetailsError] = useState<string | null>(null)
+
+  // Trạng thái chung khi đang tải hoặc làm mới dữ liệu từ server/API
+  const isDataLoading = Boolean(isLoadingDetails || isLoadingOrders || isReloading)
 
   // Tải chi tiết từng bước chụp thực tế từ Backend API
   const loadStepDetails = async () => {
@@ -264,10 +273,6 @@ export default function ManagerPhotoPage({
     setEndDate("")
   }
 
-  // Handler cho nút "Xem tất cả ảnh" (logic sẽ bổ sung sau theo yêu cầu)
-  const handleViewAllPhotos = () => {
-    alert("Tính năng xem tất cả ảnh đang được cập nhật!")
-  }
 
   // Chọn ngày trực tiếp trên mini calendar tháng
   const handleSelectCalendarDay = (day: number) => {
@@ -395,6 +400,30 @@ export default function ManagerPhotoPage({
       return matchesSearch && matchesStatus && matchesDate
     })
   }, [stepDetailsList, searchQuery, selectedStatus, startDate, endDate, ordersByPO])
+
+  // Danh sách detail items theo PhotoPackingItem cho modal Xem tất cả ảnh
+  const allPhotosItems = useMemo(() => {
+    const hasFilter =
+      Boolean(searchQuery.trim()) ||
+      selectedStatus !== "all" ||
+      Boolean(startDate) ||
+      Boolean(endDate)
+
+    if (hasFilter) {
+      return filteredStepDetails
+    }
+    return filteredStepDetails.length > 0 ? filteredStepDetails : stepDetailsList
+  }, [filteredStepDetails, stepDetailsList, searchQuery, selectedStatus, startDate, endDate])
+
+  // Handler cho nút "Xem tất cả ảnh" ở toolbar
+  const handleViewAllPhotos = () => {
+    if (allPhotosItems.length === 0) {
+      alert("Không tìm thấy dữ liệu ảnh chi tiết bước chụp nào để hiển thị!")
+      return
+    }
+    setAllPhotosInitialIndex(0)
+    setIsAllPhotosModalOpen(true)
+  }
 
   // Dữ liệu phân trang cho Tab Summary (10 record mỗi trang)
   const paginatedSummaryOrders = useMemo(() => {
@@ -625,24 +654,36 @@ export default function ManagerPhotoPage({
           <button
             type="button"
             onClick={handleViewAllPhotos}
-            className="group h-9 px-3.5 rounded-xl border border-blue-200/90 bg-blue-50/80 hover:bg-blue-100/80 active:bg-blue-200/60 text-blue-700 text-xs font-semibold flex items-center gap-2 shadow-xs shadow-blue-500/5 hover:shadow-blue-500/15 transition-all active:scale-95 cursor-pointer"
-            title="Xem tất cả ảnh (Thư viện toàn bộ ảnh)"
+            disabled={isDataLoading || allPhotosItems.length === 0}
+            className={`group h-9 px-3.5 rounded-xl border border-blue-200/90 bg-blue-50/80 hover:bg-blue-100/80 active:bg-blue-200/60 text-blue-700 text-xs font-semibold flex items-center gap-2 shadow-xs shadow-blue-500/5 hover:shadow-blue-500/15 transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none`}
+            title={
+              isDataLoading
+                ? "Đang tải dữ liệu từ máy chủ..."
+                : allPhotosItems.length === 0
+                ? "Không có ảnh nào để xem"
+                : "Xem tất cả ảnh (Thư viện toàn bộ ảnh)"
+            }
           >
             <span className="flex items-center justify-center w-5 h-5 rounded-lg bg-blue-100 text-blue-600 transition-transform group-hover:scale-105">
-              <Images className="h-3.5 w-3.5" />
+              {isDataLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />
+              ) : (
+                <Images className="h-3.5 w-3.5" />
+              )}
             </span>
-            <span>Xem tất cả ảnh</span>
+            <span>{isDataLoading ? "Đang tải..." : "Xem tất cả ảnh"}</span>
           </button>
 
           {/* Dropdown Trạng thái (Hiện đại, bo góc mềm mại, hiển thị dot indicator trực quan) */}
           <div className="relative" ref={statusDropdownRef}>
             <button
               type="button"
+              disabled={isDataLoading}
               onClick={() => {
                 setIsStatusOpen((prev) => !prev)
                 setIsDatePickerOpen(false)
               }}
-              className={`h-9 px-3 rounded-xl border text-xs font-semibold flex items-center gap-2 shadow-2xs transition-all cursor-pointer ${
+              className={`h-9 px-3 rounded-xl border text-xs font-semibold flex items-center gap-2 shadow-2xs transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
                 selectedStatus !== "all"
                   ? "border-blue-300 bg-blue-50/50 text-blue-900"
                   : "border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700"
@@ -697,11 +738,12 @@ export default function ManagerPhotoPage({
           <div className="relative" ref={datePickerRef}>
             <button
               type="button"
+              disabled={isDataLoading}
               onClick={() => {
                 setIsDatePickerOpen((prev) => !prev)
                 setIsStatusOpen(false)
               }}
-              className={`h-9 px-3 rounded-xl border text-xs font-semibold flex items-center gap-2 shadow-2xs transition-all cursor-pointer ${
+              className={`h-9 px-3 rounded-xl border text-xs font-semibold flex items-center gap-2 shadow-2xs transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${
                 startDate || endDate
                   ? "border-blue-300 bg-blue-50/50 text-blue-900"
                   : "border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700"
@@ -915,8 +957,9 @@ export default function ManagerPhotoPage({
           {(searchQuery || selectedStatus !== "all" || startDate || endDate) && (
             <button
               type="button"
+              disabled={isDataLoading}
               onClick={handleClearFilters}
-              className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline px-2 py-1 cursor-pointer transition-colors"
+              className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:underline px-2 py-1 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Xóa bộ lọc
             </button>
@@ -926,13 +969,13 @@ export default function ManagerPhotoPage({
           <button
             type="button"
             onClick={handleReloadData}
-            disabled={isReloading || isLoadingDetails || isLoadingOrders}
+            disabled={isDataLoading}
             className="group h-9 w-9 flex items-center justify-center rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 hover:text-blue-700 shadow-2xs transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
             title="Tải lại dữ liệu của trang Photo"
           >
             <RotateCw
               className={`h-3.5 w-3.5 text-slate-500 group-hover:text-blue-600 transition-transform ${
-                isReloading || isLoadingDetails || isLoadingOrders ? "animate-spin text-blue-600" : ""
+                isDataLoading ? "animate-spin text-blue-600" : ""
               }`}
             />
           </button>
@@ -941,7 +984,14 @@ export default function ManagerPhotoPage({
 
       {/* ================= TAB 1: SUMMARY TABLE ================= */}
       {activeTab === "summary" && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden relative">
+          {/* Thanh loading bar trên đầu bảng khi dữ liệu đang làm mới */}
+          {isDataLoading && (
+            <div className="h-1 w-full bg-blue-100 overflow-hidden">
+              <div className="h-full bg-blue-600 animate-pulse w-full" />
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -957,7 +1007,7 @@ export default function ManagerPhotoPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {isLoadingOrders ? (
+                {isLoadingOrders || (isDataLoading && filteredSummaryOrders.length === 0) ? (
                   <tr>
                     <td colSpan={9} className="py-14 text-center text-slate-400">
                       <RotateCcw className="h-8 w-8 mx-auto text-blue-500 animate-spin mb-3" />
@@ -989,12 +1039,13 @@ export default function ManagerPhotoPage({
                         <td className="py-3.5 pl-4 pr-3 font-mono font-bold text-slate-900 whitespace-nowrap">
                           <button
                             type="button"
+                            disabled={isDataLoading}
                             onClick={() => {
                               setSelectedOrderForGallery(order)
                               setSelectedGalleryStep(1)
                             }}
                             title="Nhấn để xem ảnh đơn hàng này"
-                            className="bg-slate-100 hover:bg-blue-100/80 text-slate-900 hover:text-blue-900 px-2.5 py-1 rounded-md transition-all font-mono font-bold text-xs cursor-pointer inline-flex items-center gap-1 border border-transparent hover:border-blue-300"
+                            className="bg-slate-100 hover:bg-blue-100/80 text-slate-900 hover:text-blue-900 px-2.5 py-1 rounded-md transition-all font-mono font-bold text-xs cursor-pointer inline-flex items-center gap-1 border border-transparent hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {order.pO}
                           </button>
@@ -1078,12 +1129,13 @@ export default function ManagerPhotoPage({
                         <td className="py-3.5 pr-4 pl-3 text-center whitespace-nowrap">
                           <button
                             type="button"
+                            disabled={isDataLoading}
                             onClick={() => {
                               setSelectedOrderForGallery(order)
                               setSelectedGalleryStep(1)
                             }}
                             title="Xem tất cả ảnh PO"
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-blue-200 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 active:scale-95 transition-all cursor-pointer"
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-blue-200 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
@@ -1103,6 +1155,7 @@ export default function ManagerPhotoPage({
             pageSize={PAGE_SIZE}
             onPageChange={setSummaryCurrentPage}
             itemLabel="đơn hàng PO"
+            disabled={isDataLoading}
           />
         </div>
       )}
@@ -1126,7 +1179,14 @@ export default function ManagerPhotoPage({
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden relative">
+            {/* Thanh loading bar trên đầu bảng Detail khi dữ liệu đang làm mới */}
+            {isDataLoading && (
+              <div className="h-1 w-full bg-blue-100 overflow-hidden">
+                <div className="h-full bg-blue-600 animate-pulse w-full" />
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
@@ -1142,7 +1202,7 @@ export default function ManagerPhotoPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {isLoadingDetails ? (
+                  {isLoadingDetails || (isDataLoading && filteredStepDetails.length === 0) ? (
                     <tr>
                       <td colSpan={8} className="py-14 text-center text-slate-400">
                         <RotateCcw className="h-8 w-8 mx-auto text-blue-500 animate-spin mb-3" />
@@ -1171,9 +1231,10 @@ export default function ManagerPhotoPage({
                           <td className="py-3.5 pl-4 pr-3 font-mono font-bold text-slate-900 whitespace-nowrap">
                             <button
                               type="button"
+                              disabled={isDataLoading}
                               onClick={() => handleOpenStepPhoto(detail)}
                               title="Xem ảnh bước này"
-                              className="bg-slate-100 hover:bg-blue-100/80 text-slate-900 hover:text-blue-900 px-2.5 py-1 rounded-md transition-all font-mono font-bold text-xs cursor-pointer inline-flex items-center gap-1 border border-transparent hover:border-blue-300"
+                              className="bg-slate-100 hover:bg-blue-100/80 text-slate-900 hover:text-blue-900 px-2.5 py-1 rounded-md transition-all font-mono font-bold text-xs cursor-pointer inline-flex items-center gap-1 border border-transparent hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {detail.poNumber}
                             </button>
@@ -1193,9 +1254,10 @@ export default function ManagerPhotoPage({
                           <td className="py-3.5 px-3 whitespace-nowrap">
                             <button
                               type="button"
+                              disabled={isDataLoading}
                               onClick={() => handleOpenStepPhoto(detail)}
                               title={`Xem ảnh Bước ${detail.stepNo}`}
-                              className="inline-flex items-center gap-1 rounded-md bg-blue-100 hover:bg-blue-200 text-blue-800 px-2.5 py-1 text-xs font-extrabold transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1 rounded-md bg-blue-100 hover:bg-blue-200 text-blue-800 px-2.5 py-1 text-xs font-extrabold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               Bước {detail.stepNo}
                             </button>
@@ -1273,8 +1335,9 @@ export default function ManagerPhotoPage({
                             <button
                               type="button"
                               title="Xem ảnh"
+                              disabled={isDataLoading}
                               onClick={() => handleOpenStepPhoto(detail)}
-                              className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-blue-200 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 active:scale-95 transition-all cursor-pointer"
+                              className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-blue-200 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <Eye className="h-4 w-4" />
                             </button>
@@ -1294,6 +1357,7 @@ export default function ManagerPhotoPage({
               pageSize={PAGE_SIZE}
               onPageChange={setDetailCurrentPage}
               itemLabel="dòng bước chụp"
+              disabled={isDataLoading}
             />
           </div>
         </div>
@@ -1307,6 +1371,14 @@ export default function ManagerPhotoPage({
           onClose={() => setSelectedOrderForGallery(null)}
         />
       )}
+
+      {/* Modal Xem tất cả ảnh (theo bố cục Master Navigation có Carousel Prev/Next) */}
+      <AllPhotosGalleryModal
+        isOpen={isAllPhotosModalOpen}
+        onClose={() => setIsAllPhotosModalOpen(false)}
+        items={allPhotosItems}
+        initialIndex={allPhotosInitialIndex}
+      />
     </div>
   )
 }

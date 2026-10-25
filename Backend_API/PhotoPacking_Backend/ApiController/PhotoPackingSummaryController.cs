@@ -25,6 +25,9 @@ namespace PhotoPacking_Backend.ApiController
         [HttpGet("orders")]
         public IActionResult GetPhotoPackingSummaries([FromQuery] string? group, [FromQuery] string? poNumber, [FromQuery] int? statusId, [FromQuery] string? userGroup)
         {
+            // Giả lập độ trễ phản hồi từ server để test hiệu ứng loading
+            Thread.Sleep(800);
+
             var summaryQuery = Data.Data.photoPackingSummaries.AsQueryable();
 
             var effectiveGroup = !string.IsNullOrWhiteSpace(userGroup) ? userGroup : group;

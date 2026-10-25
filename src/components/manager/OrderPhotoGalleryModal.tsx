@@ -10,6 +10,7 @@ import {
   ZoomIn,
   Eye,
   Maximize2,
+  Loader2,
 } from "lucide-react"
 import type { PhotoPackingSummary } from "@/types"
 
@@ -27,12 +28,26 @@ export default function OrderPhotoGalleryModal({
   // Bước đang được chọn xem trong danh sách (mặc định theo initialStep)
   const [selectedStep, setSelectedStep] = useState<number>(initialStep || 1)
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
+  const [isActualImageLoading, setIsActualImageLoading] = useState<boolean>(true)
+  const [isSampleImageLoading, setIsSampleImageLoading] = useState<boolean>(true)
+  const [isEnlargedImageLoading, setIsEnlargedImageLoading] = useState<boolean>(true)
 
   useEffect(() => {
     if (initialStep) {
       setSelectedStep(initialStep)
     }
   }, [initialStep, order])
+
+  useEffect(() => {
+    setIsActualImageLoading(true)
+    setIsSampleImageLoading(true)
+  }, [selectedStep, order])
+
+  useEffect(() => {
+    if (enlargedImage) {
+      setIsEnlargedImageLoading(true)
+    }
+  }, [enlargedImage])
 
   if (!order) return null
 
@@ -271,6 +286,15 @@ export default function OrderPhotoGalleryModal({
                 </div>
 
                 <div className="relative flex min-h-64 items-center justify-center p-3 bg-slate-950/5">
+                  {currentStepData.hasPhoto && isActualImageLoading && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-xs rounded-lg transition-opacity duration-200">
+                      <Loader2 className="h-6 w-6 text-blue-500 animate-spin mb-1.5" />
+                      <span className="text-xs text-slate-700 font-medium bg-white/90 px-2 py-0.5 rounded shadow-xs">
+                        Đang tải ảnh thực tế...
+                      </span>
+                    </div>
+                  )}
+
                   {currentStepData.hasPhoto ? (
                     <div
                       className="group relative cursor-pointer overflow-hidden rounded-lg shadow-sm"
@@ -279,10 +303,14 @@ export default function OrderPhotoGalleryModal({
                       <img
                         src={currentStepData.photoUrl}
                         alt={`Ảnh thực tế bước ${currentStepData.stepNum}`}
-                        className="max-h-72 w-auto rounded-lg object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+                        onLoad={() => setIsActualImageLoading(false)}
                         onError={(e) => {
+                          setIsActualImageLoading(false)
                           ;(e.target as HTMLImageElement).src = currentStepData.sampleUrl
                         }}
+                        className={`max-h-72 w-auto rounded-lg object-contain transition-all duration-200 group-hover:scale-[1.02] ${
+                          isActualImageLoading ? "opacity-0" : "opacity-100"
+                        }`}
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
                         <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-900 shadow">
@@ -314,6 +342,15 @@ export default function OrderPhotoGalleryModal({
                 </div>
 
                 <div className="relative flex min-h-64 items-center justify-center p-3 bg-slate-950/5">
+                  {isSampleImageLoading && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-xs rounded-lg transition-opacity duration-200">
+                      <Loader2 className="h-6 w-6 text-indigo-500 animate-spin mb-1.5" />
+                      <span className="text-xs text-slate-700 font-medium bg-white/90 px-2 py-0.5 rounded shadow-xs">
+                        Đang tải ảnh mẫu...
+                      </span>
+                    </div>
+                  )}
+
                   <div
                     className="group relative cursor-pointer overflow-hidden rounded-lg shadow-sm"
                     onClick={() => setEnlargedImage(currentStepData.sampleUrl)}
@@ -321,7 +358,11 @@ export default function OrderPhotoGalleryModal({
                     <img
                       src={currentStepData.sampleUrl}
                       alt="Ảnh mẫu đối chiếu"
-                      className="max-h-72 w-auto rounded-lg object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+                      onLoad={() => setIsSampleImageLoading(false)}
+                      onError={() => setIsSampleImageLoading(false)}
+                      className={`max-h-72 w-auto rounded-lg object-contain transition-all duration-200 group-hover:scale-[1.02] ${
+                        isSampleImageLoading ? "opacity-0" : "opacity-100"
+                      }`}
                     />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
                       <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-900 shadow">
@@ -377,10 +418,20 @@ export default function OrderPhotoGalleryModal({
             >
               <X className="h-5 w-5" />
             </button>
+            {isEnlargedImageLoading && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-xs rounded-lg min-h-64">
+                <Loader2 className="h-8 w-8 text-blue-400 animate-spin mb-2" />
+                <span className="text-xs text-slate-300 font-medium">Đang tải ảnh kích thước lớn...</span>
+              </div>
+            )}
             <img
               src={enlargedImage}
               alt="Phóng to ảnh"
-              className="max-h-[85vh] w-auto rounded-lg shadow-2xl object-contain ring-1 ring-white/10"
+              onLoad={() => setIsEnlargedImageLoading(false)}
+              onError={() => setIsEnlargedImageLoading(false)}
+              className={`max-h-[85vh] w-auto rounded-lg shadow-2xl object-contain ring-1 ring-white/10 transition-opacity duration-200 ${
+                isEnlargedImageLoading ? "opacity-0" : "opacity-100"
+              }`}
             />
           </div>
         </div>

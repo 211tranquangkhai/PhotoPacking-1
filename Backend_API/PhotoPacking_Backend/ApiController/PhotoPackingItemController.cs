@@ -22,6 +22,9 @@ namespace PhotoPacking_Backend.ApiController
         [HttpGet]
         public IActionResult GetAll([FromQuery] string? po, [FromQuery] string? group, [FromQuery] string? userGroup)
         {
+            // Giả lập độ trễ phản hồi từ server để test hiệu ứng loading
+            Thread.Sleep(800);
+
             var query = Data.Data.photoPackingItems.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(po))
@@ -45,6 +48,9 @@ namespace PhotoPacking_Backend.ApiController
         [HttpGet("{po}")]
         public IActionResult GetByPO(string po)
         {
+            // Giả lập độ trễ phản hồi từ server để test hiệu ứng loading
+            Thread.Sleep(800);
+
             var items = Data.Data.photoPackingItems
                 .Where(x => x.PONumber.Equals(po.Trim(), StringComparison.OrdinalIgnoreCase))
                 .OrderBy(x => x.StepNo)

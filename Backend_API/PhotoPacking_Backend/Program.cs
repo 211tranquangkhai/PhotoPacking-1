@@ -50,6 +50,16 @@ if (!Directory.Exists(savePath))
     Directory.CreateDirectory(savePath);
 }
 
+// Giả lập độ trễ phản hồi khi tải ảnh từ server để test hiệu ứng loading ảnh trên modal
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/Image"))
+    {
+        await Task.Delay(600);
+    }
+    await next();
+});
+
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(imagePath),
