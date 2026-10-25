@@ -4,6 +4,8 @@ import {
   X,
   Eye,
   Loader2,
+  AlertCircle,
+  LogOut,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,8 +16,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { OrderListSkeleton } from "@/components/OrderCardSkeleton"
-import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
+import { OrderListSkeleton } from "@/components/common/OrderCardSkeleton"
+import type { PhotoPackingSummary, User } from "@/types"
 import { fetchOrdersFromApi, fetchPhotosForOrderApi } from "@/services/photoPackingService"
 
 interface OrderListPageProps {
@@ -23,6 +25,9 @@ interface OrderListPageProps {
   onOpenScanCamera: () => void
   isLoading?: boolean
   onRefresh?: () => Promise<void> | void
+  userGroup?: string
+  currentUser?: User | null
+  onLogout?: () => void
 }
 
 export default function OrderListPage({
@@ -30,7 +35,11 @@ export default function OrderListPage({
   onOpenScanCamera,
   isLoading: propIsLoading,
   onRefresh,
+  userGroup,
+  currentUser,
+  onLogout,
 }: OrderListPageProps) {
+  const effectiveGroup = userGroup || currentUser?.group
   // Quản lý 2 Tab chính: "pending" (Chờ chụp) | "completed" (Đã hoàn tất)
   const [activeTab, setActiveTab] = useState<"pending" | "completed">("pending")
 
@@ -49,6 +58,7 @@ export default function OrderListPage({
   // Quản lý trạng thái loading khi chờ dữ liệu trả về từ API
   const [internalLoading, setInternalLoading] = useState(true)
   const isLoading = propIsLoading !== undefined ? propIsLoading : internalLoading
+  const [apiError, setApiError] = useState<string | null>(null)
 
   // Hiệu ứng làm mới danh sách (vòng xoay của nút refresh)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -59,14 +69,18 @@ export default function OrderListPage({
 
     async function loadInitialOrders() {
       setInternalLoading(true)
+      setApiError(null)
       try {
-        const data = await fetchOrdersFromApi()
+        const data = await fetchOrdersFromApi(effectiveGroup, undefined, undefined, effectiveGroup)
         if (isMounted) {
           setPendingOrders(data.pending)
           setCompletedOrders(data.completed)
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Lỗi khi tải dữ liệu PO từ API:", error)
+        if (isMounted) {
+          setApiError(error.message || "Không thể kết nối đến Backend API để lấy danh sách PO.")
+        }
       } finally {
         if (isMounted) {
           setInternalLoading(false)
@@ -79,7 +93,7 @@ export default function OrderListPage({
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [effectiveGroup])
 
   // Lọc danh sách theo từ khóa tìm kiếm
   const filteredPendingOrders = useMemo(() => {
@@ -114,7 +128,7 @@ export default function OrderListPage({
       if (onRefresh) {
         await onRefresh()
       } else {
-        const data = await fetchOrdersFromApi()
+        const data = await fetchOrdersFromApi(effectiveGroup, undefined, undefined, effectiveGroup)
         setPendingOrders(data.pending)
         setCompletedOrders(data.completed)
       }
@@ -149,10 +163,45 @@ export default function OrderListPage({
         {/* ========================================================= */}
         <header className="shrink-0 h-14 w-full bg-surface/95 backdrop-blur border-b border-outline-variant flex justify-between items-center px-4 z-30 transition-colors duration-200">
           <div className="flex items-center gap-2">
-            <h1 className="text-[20px] font-bold text-primary tracking-tight">Photo Packing</h1>
+            <h1 className="text-[18px] sm:text-[20px] font-bold text-primary tracking-tight">Photo Packing</h1>
+            {effectiveGroup && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                effectiveGroup === "LXA"
+                  ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                  : "bg-blue-100 text-blue-800 border border-blue-200"
+              }`}>
+                Xưởng {effectiveGroup}
+              </span>
+            )}
           </div>
-          <div className="px-3 py-1 rounded-lg bg-surface-container-high border border-outline-variant flex items-center justify-center shadow-sm">
-            <span className="text-[12px] font-bold text-primary tracking-wider">#84920</span>
+          
+          <div className="flex items-center gap-2">
+            {currentUser ? (
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-surface-container-high border border-outline-variant shadow-2xs">
+                <div className="flex flex-col text-right">
+                  <span className="text-[12px] font-bold text-primary leading-tight">
+                    {currentUser.userName}
+                  </span>
+                  <span className="text-[10px] text-secondary">
+                    NV-{currentUser.id} • {currentUser.role}
+                  </span>
+                </div>
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    title="Đăng xuất"
+                    className="p-1 rounded-md text-secondary hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="px-3 py-1 rounded-lg bg-surface-container-high border border-outline-variant flex items-center justify-center shadow-xs">
+                <span className="text-[12px] font-bold text-primary tracking-wider">#84920</span>
+              </div>
+            )}
           </div>
         </header>
 
@@ -294,6 +343,22 @@ export default function OrderListPage({
         {/* PHẦN 3: DANH SÁCH ĐƠN HÀNG ĐƯỢC CUỘN ĐỘC LẬP           */}
         {/* ========================================================= */}
         <main className="flex-1 overflow-y-auto overscroll-contain px-4 py-3.5 space-y-3.5 pb-28 scroll-smooth">
+          {apiError && (
+            <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                <span>{apiError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRefresh}
+                className="px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-medium text-[11px] cursor-pointer"
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
+
           {isLoading ? (
             <OrderListSkeleton
               count={4}

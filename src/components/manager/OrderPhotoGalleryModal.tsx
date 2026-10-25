@@ -11,7 +11,7 @@ import {
   Eye,
   Maximize2,
 } from "lucide-react"
-import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
+import type { PhotoPackingSummary } from "@/types"
 
 interface OrderPhotoGalleryModalProps {
   order: PhotoPackingSummary | null

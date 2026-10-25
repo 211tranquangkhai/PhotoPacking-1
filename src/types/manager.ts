@@ -1,39 +1,18 @@
+import type { PhotoPackingMasterNavigation } from "./photoPackingMasterNavigation"
+import type { PhotoPackingItem } from "./photoPackingItem"
+
 /**
- * Kiểu dữ liệu Master Template ảnh mẫu từng bước cho Navi OSA và Navi LXA
+ * Kiểu dữ liệu Master Template ảnh mẫu từng bước
+ * Đồng nhất hoàn toàn với PhotoPackingMasterNavigation từ Backend
  */
-export interface MasterStepTemplate {
-  id: number
-  product: string
-  productName: string
-  group: "OSA" | "LXA"
-  step: number
-  stepTitle: string
-  imagePath: string
-  standardDescription: string
-  updatedBy: string
-  updatedTime: string
-  status: "active" | "inactive"
-}
+export type MasterStepTemplate = PhotoPackingMasterNavigation
 
 /**
  * Chi tiết từng bước chụp của đơn hàng PO (Dành cho Tab Detail tại trang Photo)
+ * Đồng nhất hoàn toàn với PhotoPackingItem từ Backend
  */
-export interface OrderStepDetail {
-  id: string
-  po: string
-  productCode: string
-  productName: string
-  group: "OSA" | "LXA"
-  stepNumber: number
-  totalStep: number
-  stepTitle: string
-  photographer: string      // Người chụp
-  capturedTime: string      // Thời gian chụp
-  rawTime?: string          // Chuỗi thời gian gốc dùng lọc ngày (ISO hoặc timestamp)
-  photoUrl?: string         // URL ảnh thực tế đã chụp
-  samplePhotoUrl?: string   // URL ảnh mẫu đối chiếu
-  status: "completed" | "recapture" | "pending"
-  notes?: string
+export type OrderStepDetail = PhotoPackingItem & {
+  totalStep?: number
 }
 
 /**

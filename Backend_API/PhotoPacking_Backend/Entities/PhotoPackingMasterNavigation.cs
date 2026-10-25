@@ -1,5 +1,6 @@
 ﻿namespace PhotoPacking_Backend.Entities
 {
+    // Thông tin cấu hình từng bước chụp ảnh của từng loại sản phẩm
     public class PhotoPackingMasterNavigation
     {
         public int Id { get; set; }

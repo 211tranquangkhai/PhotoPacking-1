@@ -1,5 +1,6 @@
 ﻿namespace PhotoPacking_Backend.Entities
 {
+    // Thông tin chi tiết từng bước chụp ảnh của đơn hàng
     public class PhotoPackingItem
     {
         public int Id { get; set; } = 0;
@@ -8,7 +9,7 @@
         public string ProductName { get; set; } = string.Empty;
         public string Group { get; set; } = string.Empty;
         public int StepNo { get; set; } = 0;
-        public int SyncNasStatusId { get; set; } = 1;
+        public int SyncNasStatusId { get; set; } = 1;               // Mặc định, hiện tại chưa cần dùng đến
         public string ImagePath { get; set; } = string.Empty;
         public string Image { get; set; } = string.Empty;
         public string SampleUrl { get; set; } = string.Empty;

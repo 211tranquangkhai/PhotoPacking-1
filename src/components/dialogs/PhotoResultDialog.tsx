@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2, AlertCircle, RotateCcw, Check, RefreshCw } from "lucide-react"
-import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
+import type { PhotoPackingSummary } from "@/types"
 
 interface PhotoResultDialogProps {
   open: boolean

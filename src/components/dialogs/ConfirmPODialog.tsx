@@ -17,8 +17,7 @@ import {
   AlertTriangle,
   AlertCircle,
 } from "lucide-react"
-import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
-import type { POValidationResult } from "@/services/poLookup"
+import type { PhotoPackingSummary, POValidationResult } from "@/types"
 
 interface ConfirmPODialogProps {
   open: boolean

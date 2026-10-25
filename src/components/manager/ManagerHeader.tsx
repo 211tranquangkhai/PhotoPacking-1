@@ -6,18 +6,20 @@ import {
   FolderKanban,
   ChevronDown,
   Layers,
-  Cpu,
   RefreshCw,
   SlidersHorizontal,
+  LogOut,
 } from "lucide-react"
-import type { ManagerProfile } from "@/types/manager"
+import type { ManagerProfile } from "@/types"
 
-export type ManagerNavTab = "dashboard" | "photo" | "master-osa" | "master-lxa"
+export type ManagerNavTab = "dashboard" | "photo" | "master-navigation" | "master-osa" | "master-lxa"
 
 interface ManagerHeaderProps {
   currentTab: ManagerNavTab
   onSelectTab: (tab: ManagerNavTab) => void
   profile: ManagerProfile
+  userGroup?: string
+  onLogout?: () => void
   onSwitchToOperator?: () => void
   onRefreshAll?: () => void
   isRefreshing?: boolean
@@ -27,6 +29,8 @@ export default function ManagerHeader({
   currentTab,
   onSelectTab,
   profile,
+  userGroup,
+  onLogout,
   onSwitchToOperator,
   onRefreshAll,
   isRefreshing = false,
@@ -49,12 +53,14 @@ export default function ManagerHeader({
   }, [])
 
   const isMasterActive =
-    currentTab === "master-osa" || currentTab === "master-lxa"
+    currentTab === "master-navigation" ||
+    currentTab === "master-osa" ||
+    currentTab === "master-lxa"
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xs">
       <div className="mx-auto flex h-16 w-full max-w-[98%] items-center justify-between px-3 sm:px-4 lg:px-6">
-        
+
         {/* ================= 1. App Logo & Brand ================= */}
         <div className="flex items-center gap-8">
           <div
@@ -83,11 +89,10 @@ export default function ManagerHeader({
                 onSelectTab("dashboard")
                 setIsMasterOpen(false)
               }}
-              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${
-                currentTab === "dashboard"
-                  ? "bg-blue-50 text-blue-700 shadow-xs ring-1 ring-blue-600/20"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              }`}
+              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${currentTab === "dashboard"
+                ? "bg-blue-50 text-blue-700 shadow-xs ring-1 ring-blue-600/20"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                }`}
             >
               <LayoutDashboard className="h-4 w-4" />
               <span>Dashboard</span>
@@ -100,11 +105,10 @@ export default function ManagerHeader({
                 onSelectTab("photo")
                 setIsMasterOpen(false)
               }}
-              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${
-                currentTab === "photo"
-                  ? "bg-blue-50 text-blue-700 shadow-xs ring-1 ring-blue-600/20"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              }`}
+              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${currentTab === "photo"
+                ? "bg-blue-50 text-blue-700 shadow-xs ring-1 ring-blue-600/20"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                }`}
             >
               <Images className="h-4 w-4" />
               <span>Photo</span>
@@ -116,103 +120,61 @@ export default function ManagerHeader({
                 id="nav-master-dropdown-btn"
                 type="button"
                 onClick={() => setIsMasterOpen((prev) => !prev)}
-                className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${
-                  isMasterActive
-                    ? "bg-blue-50 text-blue-700 shadow-xs ring-1 ring-blue-600/20"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                }`}
+                className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${isMasterActive
+                  ? "bg-blue-50 text-blue-700 shadow-xs ring-1 ring-blue-600/20"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  }`}
                 aria-haspopup="true"
                 aria-expanded={isMasterOpen}
               >
                 <FolderKanban className="h-4 w-4" />
                 <span>Master</span>
                 <ChevronDown
-                  className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${
-                    isMasterOpen ? "rotate-180" : ""
-                  }`}
+                  className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isMasterOpen ? "rotate-180" : ""
+                    }`}
                 />
               </button>
 
-              {/* Master Dropdown Menu */}
+              {/* Master Dropdown Menu - Chỉ xổ xuống "Master Navigation" theo yêu cầu */}
               {isMasterOpen && (
                 <div
-                  className="absolute left-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10 ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-150"
+                  className="absolute left-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10 ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-150"
                   role="menu"
                 >
                   <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                    Cấu hình Ảnh mẫu
+                    Cấu hình Quy chuẩn
                   </div>
 
-                  {/* Navi OSA */}
+                  {/* Master Navigation */}
                   <button
-                    id="nav-master-osa-item"
+                    id="nav-master-navigation-item"
                     role="menuitem"
                     onClick={() => {
-                      onSelectTab("master-osa")
+                      onSelectTab("master-navigation")
                       setIsMasterOpen(false)
                     }}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-                      currentTab === "master-osa"
-                        ? "bg-blue-600 text-white font-semibold"
-                        : "text-slate-700 hover:bg-slate-100"
-                    }`}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer ${currentTab === "master-navigation" || currentTab === "master-osa" || currentTab === "master-lxa"
+                      ? "bg-blue-600 text-white font-semibold"
+                      : "text-slate-700 hover:bg-slate-100"
+                      }`}
                   >
                     <div
-                      className={`flex h-7 w-7 items-center justify-center rounded-md ${
-                        currentTab === "master-osa"
-                          ? "bg-blue-700 text-white"
-                          : "bg-indigo-50 text-indigo-600"
-                      }`}
+                      className={`flex h-7 w-7 items-center justify-center rounded-md ${currentTab === "master-navigation"
+                        ? "bg-blue-700 text-white"
+                        : "bg-indigo-50 text-indigo-600"
+                        }`}
                     >
                       <Layers className="h-4 w-4" />
                     </div>
                     <div className="flex flex-col text-left">
-                      <span className="font-semibold">Navi OSA</span>
+                      <span className="font-semibold">Master Navigation</span>
                       <span
-                        className={`text-[11px] ${
-                          currentTab === "master-osa"
-                            ? "text-blue-100"
-                            : "text-slate-500"
-                        }`}
+                        className={`text-[11px] ${currentTab === "master-navigation"
+                          ? "text-blue-100"
+                          : "text-slate-500"
+                          }`}
                       >
-                        Ảnh mẫu sản phẩm OSA
-                      </span>
-                    </div>
-                  </button>
-
-                  {/* Navi LXA */}
-                  <button
-                    id="nav-master-lxa-item"
-                    role="menuitem"
-                    onClick={() => {
-                      onSelectTab("master-lxa")
-                      setIsMasterOpen(false)
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-                      currentTab === "master-lxa"
-                        ? "bg-blue-600 text-white font-semibold"
-                        : "text-slate-700 hover:bg-slate-100"
-                    }`}
-                  >
-                    <div
-                      className={`flex h-7 w-7 items-center justify-center rounded-md ${
-                        currentTab === "master-lxa"
-                          ? "bg-blue-700 text-white"
-                          : "bg-emerald-50 text-emerald-600"
-                      }`}
-                    >
-                      <Cpu className="h-4 w-4" />
-                    </div>
-                    <div className="flex flex-col text-left">
-                      <span className="font-semibold">Navi LXA</span>
-                      <span
-                        className={`text-[11px] ${
-                          currentTab === "master-lxa"
-                            ? "text-blue-100"
-                            : "text-slate-500"
-                        }`}
-                      >
-                        Ảnh mẫu sản phẩm LXA
+                        Quy chuẩn chụp mẫu {userGroup ? `(${userGroup})` : ""}
                       </span>
                     </div>
                   </button>
@@ -222,7 +184,7 @@ export default function ManagerHeader({
           </nav>
         </div>
 
-        {/* ================= 3. Right Corner: Manager Profile (NO AVATAR) ================= */}
+        {/* ================= 3. Right Corner: Manager Profile (NO AVATAR) & Logout ================= */}
         <div className="flex items-center gap-3">
           {/* Nút Làm mới dữ liệu */}
           {onRefreshAll && (
@@ -259,15 +221,28 @@ export default function ManagerHeader({
               <span className="text-xs font-bold text-slate-900 tracking-tight">
                 {profile.fullName}
               </span>
-              <div className="flex items-center justify-end gap-1.5">
+              <div className="flex items-center gap-1.5">
                 <span className="inline-flex items-center rounded-sm bg-blue-100 px-1.5 py-0.2 text-[10px] font-bold text-blue-700">
                   {profile.employeeId}
                 </span>
                 <span className="text-[11px] text-slate-500 font-medium">
-                  {profile.role}
+                  {profile.role} {userGroup ? `• ${userGroup}` : ""}
                 </span>
               </div>
             </div>
+
+            {/* Nút Đăng xuất */}
+            {onLogout && (
+              <button
+                type="button"
+                id="manager-logout-btn"
+                onClick={onLogout}
+                title="Đăng xuất"
+                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer border border-transparent hover:border-rose-200"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
 

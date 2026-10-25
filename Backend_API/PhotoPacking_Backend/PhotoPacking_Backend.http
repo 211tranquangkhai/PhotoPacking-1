@@ -1,6 +1,29 @@
 @PhotoPacking_Backend_HostAddress = http://localhost:5108
 
-GET {{PhotoPacking_Backend_HostAddress}}/weatherforecast/
+### 1. Lấy danh sách tất cả người dùng
+GET {{PhotoPacking_Backend_HostAddress}}/api/user
 Accept: application/json
 
-###
+### 2. Lấy thông tin người dùng theo UserId (GET /api/user/{userId}) - Dùng để đăng nhập
+GET {{PhotoPacking_Backend_HostAddress}}/api/user/14081
+Accept: application/json
+
+### 3. Lấy thông tin người dùng role User của xưởng LXA (30090)
+GET {{PhotoPacking_Backend_HostAddress}}/api/user/30090
+Accept: application/json
+
+### 4. Đăng nhập bằng UserId qua POST (POST /api/user/login)
+POST {{PhotoPacking_Backend_HostAddress}}/api/user/login
+Content-Type: application/json
+
+{
+  "userId": 14081
+}
+
+### 5. Lọc người dùng theo Role = "User"
+GET {{PhotoPacking_Backend_HostAddress}}/api/user?role=User
+Accept: application/json
+
+### 6. Lấy danh sách tổng quát đơn hàng PhotoPackingSummary
+GET {{PhotoPacking_Backend_HostAddress}}/api/photo-packing-summary
+Accept: application/json

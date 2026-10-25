@@ -2,14 +2,15 @@ using PhotoPacking_Backend.Utilities;
 
 namespace PhotoPacking_Backend.Entities
 {
+    // Thông tin chụp ảnh tổng quát của đơn hàng
     public class PhotoPackingSummary
     {
         public int Id { get; set; }                             
         public string PO { get; set; } = string.Empty;                          // Số PO
         public string ProductCode { get; set; } = string.Empty;                 // Mã Sản phẩm
         public string ProductName { get; set; } = string.Empty;                 // Tên Sản phẩm
-        public string Group { get; set; } = string.Empty;                       // Nhóm xưởng
-        public string Creator { get; set; } = string.Empty;                     // Tên người chụp
+        public string Group { get; set; } = string.Empty;                       // Nhóm
+        public string? Creator { get; set; } = string.Empty;                    // Mã người chụp (User có Role là "User")
         public DateTime? CreateTime { get; set; }                               // Thời gian chụp
         public string Updator { get; set; } = string.Empty;                     // Người cập nhật
         public DateTime? UpdateTime { get; set; }                               // Thời gian cập nhật
@@ -20,17 +21,17 @@ namespace PhotoPacking_Backend.Entities
         public int NextStep { get; set; }                                       // Bước kế tiếp, = 0 nếu đã chụp đủ
         public bool Recapture { get; set; }                                     // Cờ để yếu cầu chụp lại
         public string Notes { get; set; } = string.Empty;                       // Ghi chú nếu có 
-        public int ShipDate { get; set; } = 0;
+        public int ShipDate { get; set; } = 0;                                  // Ngày xuất theo kiểu int yyyyMMdd 
 
         public int StatusId
         {
             get
             {
                 if (Recapture) return (int)StatusID.Recapture;
-                if (TotalStep == 0) return (int)StatusID.Done;
+                if (TotalStep == 0 || NextStep == 0 || (TotalStep > 0 && CurrentStep >= TotalStep)) return (int)StatusID.Done;
                 if (CurrentStep == 0) return (int)StatusID.New;
                 if (CurrentStep < TotalStep) return (int)StatusID.OnProgress;
-                return 0;
+                return (int)StatusID.New;
             }
         }
 

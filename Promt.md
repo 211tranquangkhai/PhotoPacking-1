@@ -1,14 +1,14 @@
 // Tài liệu để người dùng ghi chú những thông tin cần chỉnh sửa. AI không được xem đây là yêu cầu từ người dùng rồi tự ý thực hiện.
 
 Data:
-- Tạo lại toàn bộ dữ liệu test dựa theo các class trong Entities.
-- Tạo các Api Controller tương ứng.
-- Lên kế hoạch dọn dẹp dữ liệu + code dư thừa
-- Thực thi kế hoạch trên.
-- Với Api thêm master navi, ảnh sẽ lưu vào folder, dữ liệu sẽ lưu vào DB (comment nơi cần thêm code để người dùng tự thêm)
+OK- Tạo lại toàn bộ dữ liệu test dựa theo các class trong Entities.
+OK- Tạo các Api Controller tương ứng.
+OK- Lên kế hoạch dọn dẹp dữ liệu + code dư thừa
+OK- Thực thi kế hoạch trên.
+OK- Với Api thêm master navi, ảnh sẽ lưu vào folder, dữ liệu sẽ lưu vào DB (comment nơi cần thêm code để người dùng tự thêm)
 
-- Phía front end tạo/sửa interface/class tương ứng, dữ liệu từ lúc này chỉ nhận qua api back end trả về. 
-- Lên kế hoạch dọn dẹp dữ liệu và code dư thừa. Thực thi kế hoạch.
+OK- Phía front end tạo/sửa interface/class tương ứng, dữ liệu từ lúc này chỉ nhận qua api back end trả về. 
+OK- Lên kế hoạch dọn dẹp dữ liệu và code dư thừa. Thực thi kế hoạch.
 
 Header:
 - Loại bỏ nút Refresh trên thanh header, bổ sung nút đăng xuất (chỉ icon) bên trong thẻ Profile
@@ -35,5 +35,8 @@ Sửa modal thêm/sửa master.
 Cân nhắc sửa trang dashboard.
 Cân nhắc thử đưa các thẻ tổng quát bên dashboard sang Photo.
 
-Kiểm tra bổ sung hiệu ứng loading.
+Kiểm tra bổ sung hiệu ứng loading. 
+Kiểm tra đã có error ở những nơi gọi api (trường hợp api fail).
 Mỗi thành phần gọi một API riêng, do đó cân nhắc khi làm loading toàn trang.
+
+PhotoPackingItem: xem/cân nhắc các thuộc tính UI cũ

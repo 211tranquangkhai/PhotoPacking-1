@@ -21,43 +21,26 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { validateImagePO, type POValidationResult } from "@/services/poLookup"
+import { validateImagePO } from "@/services/poLookup"
 import { submitPhoto, confirmStep } from "@/services/photoPackingApi"
-import type { SubmitPhotoResult, ConfirmStepResult } from "@/services/photoPackingApi"
 import { fetchOrderByPOApi } from "@/services/photoPackingService"
-import { ConfirmPODialog } from "@/components/ConfirmPODialog"
-import { PhotoResultDialog } from "@/components/PhotoResultDialog"
-import { NotifyResultDialog } from "@/components/NotifyResultDialog"
-import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
-
-/**
- * Các bước trong luồng chụp ảnh theo sơ đồ flowchart:
- * preview → scanning → confirm-po → uploading → result → confirming → done
- */
-type CameraFlowStep =
-  | "preview"     // Camera live, chờ người dùng chụp
-  | "scanning"    // Đã chụp, đang quét barcode trên ảnh
-  | "confirm-po"  // Phát hiện PO, hiển thị dialog xác nhận
-  | "uploading"   // Đang gửi ảnh lên API (Send API lần 1)
-  | "result"      // API trả kết quả, hiển thị ảnh chụp + ảnh mẫu đối chiếu
-  | "confirming"  // Đang gọi API xác nhận hoàn tất (Send API lần 2)
-  | "done"        // Hoàn tất, hiển thị thông báo thành công
+import { ConfirmPODialog } from "@/components/dialogs/ConfirmPODialog"
+import { PhotoResultDialog } from "@/components/dialogs/PhotoResultDialog"
+import { NotifyResultDialog } from "@/components/dialogs/NotifyResultDialog"
+import type {
+  PhotoPackingSummary,
+  CameraFlowStep,
+  ResolutionKey,
+  POValidationResult,
+  SubmitPhotoResult,
+  ConfirmStepResult,
+} from "@/types"
+import { RESOLUTION_CONFIG } from "@/types"
 
 interface CameraPageProps {
   po: string
   scannedCodeMeta?: { format?: string; codeType?: "barcode" | "qrcode" } | null
   onBack: () => void
-}
-
-type ResolutionKey = "720p" | "1080p" | "4k"
-
-const RESOLUTION_CONFIG: Record<
-  ResolutionKey,
-  { label: string; width: number; height: number }
-> = {
-  "720p": { label: "720p (HD)", width: 1280, height: 720 },
-  "1080p": { label: "1080p (FHD)", width: 1920, height: 1080 },
-  "4k": { label: "4K (UHD)", width: 3840, height: 2160 },
 }
 
 export default function CameraPage({

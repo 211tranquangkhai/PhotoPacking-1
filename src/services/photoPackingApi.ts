@@ -1,32 +1,15 @@
-export interface SubmitPhotoParams {
-  po: string
-  stepNumber: number
-  imageBase64: string
-  productName?: string
-}
+import type {
+  SubmitPhotoParams,
+  SubmitPhotoResult,
+  ConfirmStepParams,
+  ConfirmStepResult,
+} from "@/types/camera"
 
-export interface SubmitPhotoResult {
-  success: boolean
-  message: string
-  hasNextStep?: boolean
-  nextStepNumber?: number
-  totalStep?: number
-  isCompleted?: boolean
-}
-
-export interface ConfirmStepParams {
-  po: string
-  stepNumber: number
-  totalStep?: number
-}
-
-export interface ConfirmStepResult {
-  success: boolean
-  message: string
-  hasNextStep?: boolean
-  nextStepNumber?: number
-  totalStep?: number
-  isCompleted?: boolean
+export type {
+  SubmitPhotoParams,
+  SubmitPhotoResult,
+  ConfirmStepParams,
+  ConfirmStepResult,
 }
 
 /**

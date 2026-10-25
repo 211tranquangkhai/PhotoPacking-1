@@ -18,12 +18,12 @@ import {
   FileText,
   ExternalLink,
 } from "lucide-react"
-import type { NaviOSA } from "@/types/NaviOSA"
+import type { PhotoPackingMasterNavigation, User as UserType } from "@/types"
 import {
-  getNaviOSAList,
-  upsertNaviOSA,
-  deleteNaviOSA,
-} from "@/services/naviOSAService"
+  fetchMasterNavigations,
+  upsertMasterNavigation,
+  deleteAndRefreshMasterNavigations,
+} from "@/services/photoPackingMasterNavigationService"
 
 // Danh sách các ảnh mẫu template có sẵn trong hệ thống để chọn nhanh
 const AVAILABLE_TEMPLATES = [
@@ -35,44 +35,70 @@ const AVAILABLE_TEMPLATES = [
   { name: "Cụm chuẩn (SI)", url: "/Image/Template/SI.jpg" },
 ]
 
-export default function MasterNaviOSAPage() {
-  // Dữ liệu danh sách NaviOSA
-  const [items, setItems] = useState<NaviOSA[]>([])
+interface MasterNavigationPageProps {
+  group?: "OSA" | "LXA" | string
+  currentUser?: UserType | null
+}
+
+export default function MasterNavigationPage({
+  group = "OSA",
+  currentUser,
+}: MasterNavigationPageProps) {
+  const activeGroup = group || currentUser?.group || "OSA"
+
+  // Dữ liệu danh sách Master Navigation
+  const [items, setItems] = useState<PhotoPackingMasterNavigation[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Modal Thêm / Chỉnh sửa
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<NaviOSA | null>(null)
+  const [editingItem, setEditingItem] = useState<PhotoPackingMasterNavigation | null>(null)
 
   // Form Fields
   const [formProductKey, setFormProductKey] = useState("")
   const [formStepNo, setFormStepNo] = useState<number>(1)
-  const [formGroup, setFormGroup] = useState("OSA")
+  const [formGroup, setFormGroup] = useState(activeGroup)
   const [formImagePath, setFormImagePath] = useState("/Image/Template/Tray.jpg")
   const [formNotes, setFormNotes] = useState("")
-  const [formCreator, setFormCreator] = useState("NV-10321")
+  const [formCreator, setFormCreator] = useState(currentUser ? String(currentUser.id) : "NV-10321")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Modal Xóa
-  const [deletingItem, setDeletingItem] = useState<NaviOSA | null>(null)
+  const [deletingItem, setDeletingItem] = useState<PhotoPackingMasterNavigation | null>(null)
 
-  // Modal Xem chi tiết ảnh mẫu & thông tin record NaviOSA (80% màn hình)
-  const [viewingItem, setViewingItem] = useState<NaviOSA | null>(null)
+  // Modal Xem chi tiết ảnh mẫu & thông tin record Master Navigation (80% màn hình)
+  const [viewingItem, setViewingItem] = useState<PhotoPackingMasterNavigation | null>(null)
 
   // Toast thông báo
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 3000)
   }
 
-  // Load danh sách dữ liệu khi mount
+  // Load danh sách dữ liệu từ Backend API khi mount hoặc khi activeGroup thay đổi
+  const loadData = async (targetGroup: string = activeGroup) => {
+    setIsLoading(true)
+    setErrorMessage(null)
+    try {
+      const data = await fetchMasterNavigations(targetGroup)
+      setItems(data)
+    } catch (err: any) {
+      setErrorMessage(err.message || `Không thể kết nối đến Backend API để lấy danh sách Master Navigation cho xưởng ${targetGroup}.`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
-    const data = getNaviOSAList()
-    setItems(data)
-  }, [])
+    loadData(activeGroup)
+    setFormGroup(activeGroup)
+  }, [activeGroup])
 
   // Danh sách các mã sản phẩm duy nhất để lọc
   const uniqueProducts = useMemo(() => {
@@ -93,24 +119,24 @@ export default function MasterNaviOSAPage() {
   // Mở modal thêm mới
   const handleOpenAdd = (suggestedProductKey?: string, nextStep?: number) => {
     setEditingItem(null)
-    setFormProductKey(suggestedProductKey || "H0090924")
+    setFormProductKey(suggestedProductKey || (activeGroup === "LXA" ? "LXA-MOD-204" : "H0090924"))
     setFormStepNo(nextStep || 1)
-    setFormGroup("OSA")
+    setFormGroup(activeGroup)
     setFormImagePath("/Image/Template/Tray.jpg")
-    setFormNotes("Kiểm tra khay định hình linh kiện và tem nhãn quy chuẩn phân xưởng Navi OSA.")
-    setFormCreator("NV-10321")
+    setFormNotes(`Kiểm tra quy chuẩn đóng gói sản phẩm phân xưởng ${activeGroup}.`)
+    setFormCreator(currentUser ? String(currentUser.id) : "NV-10321")
     setIsFormOpen(true)
   }
 
   // Mở modal chỉnh sửa
-  const handleOpenEdit = (item: NaviOSA) => {
+  const handleOpenEdit = (item: PhotoPackingMasterNavigation) => {
     setEditingItem(item)
     setFormProductKey(item.productKey)
     setFormStepNo(item.stepNo)
-    setFormGroup(item.group || "OSA")
-    setFormImagePath(item.imagePath)
+    setFormGroup(item.group || activeGroup)
+    setFormImagePath(item.templatePath || "/Image/Template/Tray.jpg")
     setFormNotes(item.notes)
-    setFormCreator(item.creator)
+    setFormCreator(String(item.creator ?? (currentUser ? currentUser.id : "NV-10321")))
     setIsFormOpen(true)
   }
 
@@ -129,52 +155,74 @@ export default function MasterNaviOSAPage() {
     }
   }
 
-  // Lưu Form Thêm mới / Cập nhật
-  const handleSave = (e: React.FormEvent) => {
+  // Lưu Form Thêm mới / Cập nhật qua Backend API
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formProductKey.trim()) {
       alert("Vui lòng nhập Mã sản phẩm (productKey)")
       return
     }
 
-    const saved = upsertNaviOSA({
-      id: editingItem ? editingItem.id : undefined,
-      productKey: formProductKey.trim(),
-      stepNo: Number(formStepNo) || 1,
-      group: formGroup.trim() || "OSA",
-      imagePath: formImagePath,
-      notes: formNotes.trim(),
-      creator: formCreator.trim() || "NV-10321",
-      updater: "NV-10321",
-    })
+    try {
+      setIsLoading(true)
+      const saved = await upsertMasterNavigation(
+        {
+          id: editingItem ? editingItem.id : undefined,
+          productKey: formProductKey.trim(),
+          stepNo: Number(formStepNo) || 1,
+          group: formGroup.trim() || activeGroup,
+          templatePath: formImagePath,
+          notes: formNotes.trim(),
+          creator: formCreator.trim() ? (Number(formCreator.trim()) || undefined) : undefined,
+          updater: currentUser ? currentUser.id : undefined,
+        },
+        activeGroup
+      )
 
-    setItems(saved)
-    setIsFormOpen(false)
-    showToast(
-      editingItem
-        ? `Đã cập nhật bước ${formStepNo} của sản phẩm ${formProductKey}!`
-        : `Đã thêm mới bước ${formStepNo} cho sản phẩm ${formProductKey}!`
-    )
+      setItems(saved)
+      setIsFormOpen(false)
+      showToast(
+        editingItem
+          ? `Đã cập nhật bước ${formStepNo} của sản phẩm ${formProductKey} thành công!`
+          : `Đã thêm mới bước ${formStepNo} cho sản phẩm ${formProductKey} thành công!`
+      )
+    } catch (err: any) {
+      alert("Lỗi khi lưu lên server: " + (err.message || "Không thể lưu dữ liệu"))
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  // Xác nhận xóa
-  const handleConfirmDelete = () => {
+  // Xác nhận xóa qua Backend API
+  const handleConfirmDelete = async () => {
     if (!deletingItem) return
-    const saved = deleteNaviOSA(deletingItem.id)
-    setItems(saved)
-    showToast(`Đã xóa bước ${deletingItem.stepNo} của sản phẩm ${deletingItem.productKey}.`)
-    setDeletingItem(null)
+    try {
+      setIsLoading(true)
+      const saved = await deleteAndRefreshMasterNavigations(deletingItem.id, activeGroup)
+      setItems(saved)
+      showToast(`Đã xóa bước ${deletingItem.stepNo} của sản phẩm ${deletingItem.productKey}.`)
+      setDeletingItem(null)
+    } catch (err: any) {
+      alert("Lỗi khi xóa trên server: " + (err.message || "Không thể xóa"))
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  // Làm mới dữ liệu
-  const handleRefresh = () => {
+  // Làm mới dữ liệu từ Backend API
+  const handleRefresh = async () => {
     setIsRefreshing(true)
-    const data = getNaviOSAList()
-    setItems(data)
-    showToast("Đã làm mới dữ liệu NaviOSA!")
-    setTimeout(() => setIsRefreshing(false), 500)
+    try {
+      const data = await fetchMasterNavigations(activeGroup)
+      setItems(data)
+      setErrorMessage(null)
+      showToast(`Đã làm mới dữ liệu Master Navigation xưởng ${activeGroup} từ server!`)
+    } catch (err: any) {
+      setErrorMessage(err.message || "Lỗi khi kết nối đến API server.")
+    } finally {
+      setIsRefreshing(false)
+    }
   }
-
 
   return (
     <div className="space-y-6 pb-16">
@@ -185,6 +233,43 @@ export default function MasterNaviOSAPage() {
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* ================= Tiêu đề Master Navigation theo Group người dùng ================= */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div
+            className={`flex h-11 w-11 items-center justify-center rounded-xl shadow-md ${
+              activeGroup === "LXA"
+                ? "bg-linear-to-tr from-emerald-600 to-teal-500 text-white shadow-emerald-500/20"
+                : "bg-linear-to-tr from-blue-600 to-indigo-500 text-white shadow-blue-500/20"
+            }`}
+          >
+            <Layers className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">
+                Master Navigation
+              </h1>
+              <span
+                className={`inline-flex items-center rounded-lg px-2.5 py-0.5 text-xs font-bold border ${
+                  activeGroup === "LXA"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-blue-50 text-blue-700 border-blue-200"
+                }`}
+              >
+                Phân xưởng {activeGroup}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Quản lý danh sách cấu hình và ảnh mẫu quy chuẩn các bước chụp của xưởng {activeGroup}
+            </p>
+          </div>
+        </div>
+        <div className="text-xs text-slate-400 font-medium hidden sm:block">
+          Tổng số bước: <span className="font-bold text-slate-700">{items.length}</span>
+        </div>
+      </div>
 
       {/* ================= Toolbar: Tìm kiếm ProductKey (thu nhỏ) & Nút Thêm mới + Refresh ================= */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
@@ -233,6 +318,25 @@ export default function MasterNaviOSAPage() {
         </div>
       </div>
 
+      {/* Thông báo lỗi khi gọi API thất bại */}
+      {errorMessage && (
+        <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              void loadData()
+            }}
+            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs transition-colors cursor-pointer"
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
+
       {/* ================= DATA TABLE (BẢNG CRUD DỮ LIỆU NAVIOSA - ĐÃ BỎ CỘT ẢNH MẪU) ================= */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -250,7 +354,15 @@ export default function MasterNaviOSAPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredItems.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={8} className="py-16 text-center text-slate-400">
+                    <RotateCcw className="h-8 w-8 mx-auto text-blue-500 animate-spin mb-3" />
+                    <p className="font-semibold text-slate-700">Đang tải dữ liệu từ Backend API...</p>
+                    <p className="text-xs text-slate-400 mt-1">Vui lòng chờ trong giây lát</p>
+                  </td>
+                </tr>
+              ) : filteredItems.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-14 text-center text-slate-400">
                     <Layers className="h-10 w-10 mx-auto text-slate-300 mb-2" />
@@ -318,7 +430,7 @@ export default function MasterNaviOSAPage() {
                         </div>
                         <div className="flex items-center gap-1 text-slate-400 text-[10px]">
                           <Calendar className="h-3 w-3" />
-                          <span>{item.createdTime || "—"}</span>
+                          <span>{item.createdTime || item.createTime || "—"}</span>
                         </div>
                       </div>
                     </td>
@@ -429,7 +541,7 @@ export default function MasterNaviOSAPage() {
               {/* Khung chứa ảnh mẫu lớn */}
               <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
                 <img
-                  src={viewingItem.imagePath}
+                  src={viewingItem.templatePath}
                   alt={`Mẫu ${viewingItem.productKey} - Bước ${viewingItem.stepNo}`}
                   className="max-h-full max-w-full object-contain rounded-xl shadow-2xl transition-transform duration-300"
                   onError={(e) => {
@@ -441,10 +553,10 @@ export default function MasterNaviOSAPage() {
               {/* Caption nhỏ ở đáy ảnh kèm link mở ảnh gốc */}
               <div className="absolute bottom-4 left-4 right-4 z-10 flex items-center justify-between text-[11px] text-slate-400">
                 <span className="truncate max-w-xs sm:max-w-md font-mono text-slate-400">
-                  {viewingItem.imagePath}
+                  {viewingItem.templatePath}
                 </span>
                 <a
-                  href={viewingItem.imagePath}
+                  href={viewingItem.templatePath}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 hover:underline transition-colors ml-2 flex-shrink-0"
@@ -494,13 +606,13 @@ export default function MasterNaviOSAPage() {
                   </p>
                 </div>
 
-                {/* Đường dẫn ảnh mẫu (imagePath) */}
+                {/* Đường dẫn ảnh mẫu (templatePath) */}
                 <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4">
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
-                    Đường dẫn tệp ảnh (imagePath)
+                    Đường dẫn tệp ảnh mẫu (templatePath)
                   </span>
                   <div className="flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-200 px-3 py-2 text-xs font-mono text-slate-700">
-                    <span className="truncate">{viewingItem.imagePath}</span>
+                    <span className="truncate">{viewingItem.templatePath}</span>
                   </div>
                 </div>
 
@@ -527,7 +639,7 @@ export default function MasterNaviOSAPage() {
                     </div>
                     <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-1">
                       <Calendar className="h-3 w-3 text-slate-400" />
-                      <span>{viewingItem.createdTime}</span>
+                      <span>{viewingItem.createdTime || viewingItem.createTime || "—"}</span>
                     </div>
                   </div>
 

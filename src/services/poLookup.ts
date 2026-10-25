@@ -1,40 +1,8 @@
 import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
 import { getCachedOrders } from "@/services/photoPackingService"
+import type { ProcessScannedCodeResult, POValidationResult } from "@/types/camera"
 
-export interface ProcessScannedCodeResult {
-  success: boolean
-  poCode?: string
-  poSummary?: PhotoPackingSummary
-  codeType: "barcode" | "qrcode"
-  format?: string
-  rawText: string
-  errorMessage?: string
-}
-
-/**
- * Kết quả đối chiếu mã quét trên ảnh chụp với mã PO mục tiêu
- */
-export type POValidationResult =
-  | {
-      status: "matched"
-      detectedPO: string
-      codeType?: "barcode" | "qrcode"
-      format?: string
-      message: string
-    }
-  | {
-      status: "mismatched"
-      detectedPO: string
-      targetPO: string
-      codeType?: "barcode" | "qrcode"
-      format?: string
-      message: string
-    }
-  | {
-      status: "not_found"
-      targetPO: string
-      message: string
-    }
+export type { ProcessScannedCodeResult, POValidationResult }
 
 /**
  * Trích xuất mã PO từ chuỗi thô (nếu là QR Code hoặc Barcode phân tách bằng dấu chấm phẩy)

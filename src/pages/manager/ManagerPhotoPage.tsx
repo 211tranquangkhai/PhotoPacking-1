@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   Images,
   TableProperties,
@@ -11,20 +11,26 @@ import {
   User,
   Calendar,
   X,
+  RotateCcw,
+  AlertCircle,
 } from "lucide-react"
-import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
-import type { OrderStepDetail } from "@/types/manager"
+import type { PhotoPackingSummary, OrderStepDetail } from "@/types"
 import { generateStepDetailsFromOrders } from "@/services/managerService"
+import { fetchPhotoPackingItems } from "@/services/photoPackingItemService"
 import OrderPhotoGalleryModal from "@/components/manager/OrderPhotoGalleryModal"
 
 interface ManagerPhotoPageProps {
   orders: PhotoPackingSummary[]
   initialTab?: "summary" | "detail"
+  isLoadingOrders?: boolean
+  userGroup?: string
 }
 
 export default function ManagerPhotoPage({
   orders,
   initialTab = "detail",
+  isLoadingOrders = false,
+  userGroup,
 }: ManagerPhotoPageProps) {
   // Quản lý tab: "summary" (PhotoPackingSummary) | "detail" (Chi tiết từng bước)
   const [activeTab, setActiveTab] = useState<"summary" | "detail">(initialTab)
@@ -42,36 +48,59 @@ export default function ManagerPhotoPage({
 
   // Mở modal xem ảnh cho một bước cụ thể trong Tab Detail
   const handleOpenStepPhoto = (detail: OrderStepDetail) => {
-    const parent = orders.find((o) => o.pO === detail.po)
+    const parent = orders.find((o) => o.pO === detail.poNumber)
     if (parent) {
       setSelectedOrderForGallery(parent)
     } else {
       setSelectedOrderForGallery({
-        pO: detail.po,
+        pO: detail.poNumber,
         productCode: detail.productCode,
         productName: detail.productName,
         group: detail.group,
-        creator: detail.photographer,
-        createTime: detail.capturedTime,
-        updator: "NV-10321",
-        updatedTime: detail.capturedTime,
+        creator: typeof detail.creator === "number" ? `NV-${detail.creator}` : String(detail.creator || "NV-QUANG"),
+        createTime: detail.createTime,
+        updator: typeof detail.updater === "number" ? `NV-${detail.updater}` : "NV-10321",
+        updatedTime: detail.updatedTime || detail.createTime,
         type: "Box",
-        productKey: "BOX",
-        totalStep: detail.totalStep,
-        currentStep: detail.stepNumber,
+        productKey: detail.productKey || "BOX",
+        totalStep: detail.totalStep || 2,
+        currentStep: detail.stepNo,
         notes: detail.notes || "",
-        statusId: detail.status === "completed" ? 3 : detail.status === "recapture" ? 2 : 0,
-        photoUrls: detail.photoUrl ? [detail.photoUrl] : [],
-        samplePhotoUrl: detail.samplePhotoUrl,
+        statusId: detail.reCapture ? 2 : detail.imagePath ? 3 : 0,
+        photoUrls: detail.imagePath ? [detail.imagePath] : [],
+        samplePhotoUrl: detail.sampleUrl,
       })
     }
-    setSelectedGalleryStep(detail.stepNumber)
+    setSelectedGalleryStep(detail.stepNo)
   }
 
-  // Tạo danh sách dữ liệu chi tiết từng bước cho tab Detail
+  const [apiStepDetails, setApiStepDetails] = useState<OrderStepDetail[]>([])
+  const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(true)
+  const [detailsError, setDetailsError] = useState<string | null>(null)
+
+  // Tải chi tiết từng bước chụp thực tế từ Backend API
+  const loadStepDetails = async () => {
+    setIsLoadingDetails(true)
+    setDetailsError(null)
+    try {
+      const items = await fetchPhotoPackingItems(undefined, userGroup, userGroup)
+      setApiStepDetails(items as OrderStepDetail[])
+    } catch (err: any) {
+      setDetailsError(err.message || "Không thể tải chi tiết bước chụp từ Backend API.")
+    } finally {
+      setIsLoadingDetails(false)
+    }
+  }
+
+  useEffect(() => {
+    loadStepDetails()
+  }, [userGroup])
+
+  // Tạo danh sách dữ liệu chi tiết từng bước cho tab Detail (ưu tiên dữ liệu từ API)
   const stepDetailsList: OrderStepDetail[] = useMemo(() => {
+    if (apiStepDetails.length > 0) return apiStepDetails
     return generateStepDetailsFromOrders(orders)
-  }, [orders])
+  }, [apiStepDetails, orders])
 
   // Kiểm tra một mốc thời gian có nằm trong khoảng từ ngày ... đến ngày ... hay không
   const isDateInRange = (dateVal?: string | Date) => {
@@ -118,23 +147,28 @@ export default function ManagerPhotoPage({
       // 1. Lọc theo tìm kiếm
       const matchesSearch =
         !query ||
-        detail.po.toLowerCase().includes(query) ||
+        detail.poNumber.toLowerCase().includes(query) ||
         detail.productCode.toLowerCase().includes(query) ||
         detail.productName.toLowerCase().includes(query) ||
-        detail.photographer.toLowerCase().includes(query) ||
-        detail.stepTitle.toLowerCase().includes(query)
+        (detail.creator && String(detail.creator).toLowerCase().includes(query)) ||
+        `bước ${detail.stepNo}`.includes(query) ||
+        (detail.notes && detail.notes.toLowerCase().includes(query))
 
       // 2. Lọc theo Trạng thái bước
       let matchesStatus = true
       if (selectedStatus !== "all") {
-        if (selectedStatus === "3") matchesStatus = detail.status === "completed"
-        else if (selectedStatus === "2") matchesStatus = detail.status === "recapture"
+        const isCompleted = !detail.reCapture && Boolean(detail.imagePath)
+        const isRecapture = detail.reCapture
+        const isPending = !detail.imagePath && !detail.reCapture
+
+        if (selectedStatus === "3") matchesStatus = isCompleted
+        else if (selectedStatus === "2") matchesStatus = isRecapture
         else if (selectedStatus === "0" || selectedStatus === "1")
-          matchesStatus = detail.status === "pending"
+          matchesStatus = isPending
       }
 
       // 3. Lọc theo Khoảng ngày (Từ ngày ... Đến ngày ...)
-      const matchesDate = isDateInRange(detail.rawTime || detail.capturedTime)
+      const matchesDate = isDateInRange(detail.updatedTime || detail.createTime)
 
       return matchesSearch && matchesStatus && matchesDate
     })
@@ -314,7 +348,15 @@ export default function ManagerPhotoPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredSummaryOrders.length === 0 ? (
+                {isLoadingOrders ? (
+                  <tr>
+                    <td colSpan={9} className="py-14 text-center text-slate-400">
+                      <RotateCcw className="h-8 w-8 mx-auto text-blue-500 animate-spin mb-3" />
+                      <p className="font-semibold text-slate-700">Đang tải danh sách đơn hàng từ Backend API...</p>
+                      <p className="text-xs text-slate-400 mt-1">Vui lòng chờ trong giây lát</p>
+                    </td>
+                  </tr>
+                ) : filteredSummaryOrders.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-12 text-center text-slate-400">
                       <Images className="h-10 w-10 mx-auto text-slate-300 mb-2" />
@@ -470,33 +512,58 @@ export default function ManagerPhotoPage({
 
       {/* ================= TAB 2: DETAIL TABLE (CHI TIẾT TỪNG BƯỚC) ================= */}
       {activeTab === "detail" && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-                  <th className="py-3.5 pl-4 pr-3">PO</th>
-                  <th className="py-3.5 px-3">Tên sản phẩm</th>
-                  <th className="py-3.5 px-3 font-extrabold text-slate-900">Bước</th>
-                  <th className="py-3.5 px-3 font-extrabold text-slate-900">Người chụp</th>
-                  <th className="py-3.5 px-3 font-extrabold text-slate-900">Thời gian chụp</th>
-                  <th className="py-3.5 px-3">Trạng thái</th>
-                  <th className="py-3.5 px-3">Notes</th>
-                  <th className="py-3.5 pr-4 pl-3 text-center">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredStepDetails.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="py-12 text-center text-slate-400">
-                      <Images className="h-10 w-10 mx-auto text-slate-300 mb-2" />
-                      <p className="font-semibold text-slate-600">Không tìm thấy bước chụp nào phù hợp</p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Hãy thử điều chỉnh bộ lọc bước hoặc từ khóa tìm kiếm
-                      </p>
-                    </td>
+        <div className="space-y-4">
+          {detailsError && (
+            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
+                <span>{detailsError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={loadStepDetails}
+                className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs transition-colors cursor-pointer"
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+                    <th className="py-3.5 pl-4 pr-3">PO</th>
+                    <th className="py-3.5 px-3">Tên sản phẩm</th>
+                    <th className="py-3.5 px-3 font-extrabold text-slate-900">Bước</th>
+                    <th className="py-3.5 px-3 font-extrabold text-slate-900">Người chụp</th>
+                    <th className="py-3.5 px-3 font-extrabold text-slate-900">Thời gian chụp</th>
+                    <th className="py-3.5 px-3">Trạng thái</th>
+                    <th className="py-3.5 px-3">Notes</th>
+                    <th className="py-3.5 pr-4 pl-3 text-center">Thao tác</th>
                   </tr>
-                ) : (
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isLoadingDetails ? (
+                    <tr>
+                      <td colSpan={8} className="py-14 text-center text-slate-400">
+                        <RotateCcw className="h-8 w-8 mx-auto text-blue-500 animate-spin mb-3" />
+                        <p className="font-semibold text-slate-700">Đang tải danh sách các bước chụp từ API...</p>
+                        <p className="text-xs text-slate-400 mt-1">Vui lòng chờ trong giây lát</p>
+                      </td>
+                    </tr>
+                  ) : filteredStepDetails.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                        <Images className="h-10 w-10 mx-auto text-slate-300 mb-2" />
+                        <p className="font-semibold text-slate-600">Không tìm thấy bước chụp nào phù hợp</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Hãy thử điều chỉnh bộ lọc bước hoặc từ khóa tìm kiếm
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
                   filteredStepDetails.map((detail) => {
                     return (
                       <tr
@@ -511,7 +578,7 @@ export default function ManagerPhotoPage({
                             title="Xem ảnh bước này"
                             className="bg-slate-100 hover:bg-blue-100/80 text-slate-900 hover:text-blue-900 px-2.5 py-1 rounded-md transition-all font-mono font-bold text-xs cursor-pointer inline-flex items-center gap-1 border border-transparent hover:border-blue-300"
                           >
-                            {detail.po}
+                            {detail.poNumber}
                           </button>
                         </td>
 
@@ -530,10 +597,10 @@ export default function ManagerPhotoPage({
                           <button
                             type="button"
                             onClick={() => handleOpenStepPhoto(detail)}
-                            title={`Xem ảnh Bước ${detail.stepNumber}`}
+                            title={`Xem ảnh Bước ${detail.stepNo}`}
                             className="inline-flex items-center gap-1 rounded-md bg-blue-100 hover:bg-blue-200 text-blue-800 px-2.5 py-1 text-xs font-extrabold transition-colors cursor-pointer"
                           >
-                            Bước {detail.stepNumber}
+                            Bước {detail.stepNo}
                           </button>
                         </td>
 
@@ -541,7 +608,11 @@ export default function ManagerPhotoPage({
                         <td className="py-3.5 px-3 whitespace-nowrap font-bold text-slate-900">
                           <div className="flex items-center gap-1.5">
                             <User className="h-3.5 w-3.5 text-blue-600" />
-                            <span>{detail.photographer}</span>
+                            <span>
+                              {typeof detail.creator === "number"
+                                ? `NV-${detail.creator}`
+                                : detail.creator || "—"}
+                            </span>
                           </div>
                         </td>
 
@@ -549,25 +620,27 @@ export default function ManagerPhotoPage({
                         <td className="py-3.5 px-3 whitespace-nowrap font-medium text-slate-600 text-[11px]">
                           <div className="flex items-center gap-1">
                             <Clock className="h-3.5 w-3.5 text-slate-400" />
-                            <span>{detail.capturedTime}</span>
+                            <span>
+                              {detail.createTime
+                                ? new Date(detail.createTime).toLocaleString("vi-VN")
+                                : "—"}
+                            </span>
                           </div>
                         </td>
 
                         {/* Trạng thái bước */}
                         <td className="py-3.5 px-3 whitespace-nowrap">
-                          {detail.status === "completed" && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Đã chụp đạt
-                            </span>
-                          )}
-                          {detail.status === "recapture" && (
+                          {detail.reCapture ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
                               <AlertTriangle className="h-3.5 w-3.5" />
                               Cần chụp lại
                             </span>
-                          )}
-                          {detail.status === "pending" && (
+                          ) : detail.imagePath ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Đã chụp đạt
+                            </span>
+                          ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
                               <Clock className="h-3.5 w-3.5" />
                               Chưa chụp
@@ -611,13 +684,14 @@ export default function ManagerPhotoPage({
               Tổng cộng: <strong>{filteredStepDetails.length}</strong> dòng bước chụp chi tiết
             </span>
             <div className="flex items-center gap-4">
-              <span>Đạt: <strong className="text-emerald-700">{filteredStepDetails.filter((d) => d.status === "completed").length}</strong></span>
-              <span>Cần chụp lại: <strong className="text-amber-700">{filteredStepDetails.filter((d) => d.status === "recapture").length}</strong></span>
-              <span>Chưa chụp: <strong className="text-slate-700">{filteredStepDetails.filter((d) => d.status === "pending").length}</strong></span>
+              <span>Đạt: <strong className="text-emerald-700">{filteredStepDetails.filter((d) => !d.reCapture && Boolean(d.imagePath)).length}</strong></span>
+              <span>Cần chụp lại: <strong className="text-amber-700">{filteredStepDetails.filter((d) => d.reCapture).length}</strong></span>
+              <span>Chưa chụp: <strong className="text-slate-700">{filteredStepDetails.filter((d) => !d.imagePath && !d.reCapture).length}</strong></span>
             </div>
           </div>
         </div>
-      )}
+      </div>
+    )}
 
       {/* Modal xem ảnh (OrderPhotoGalleryModal) khi click "Xem ảnh" tại Summary hoặc nút icon tại Detail */}
       {selectedOrderForGallery && (

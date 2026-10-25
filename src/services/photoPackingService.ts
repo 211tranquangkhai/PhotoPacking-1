@@ -1,4 +1,6 @@
-import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
+import type { PhotoPackingSummary } from "@/types"
+
+const BASE_URL = "/api/photo-packing-summary"
 
 // Bộ nhớ đệm danh sách đơn hàng đã tải từ server Backend
 let cachedOrders: PhotoPackingSummary[] = []
@@ -12,14 +14,31 @@ export function setCachedOrders(orders: PhotoPackingSummary[]) {
 }
 
 /**
- * Gọi lấy danh sách đơn hàng PO từ server Backend API (/api/orders)
+ * Gọi lấy danh sách đơn hàng PO từ server Backend API (/api/photo-packing-summary)
  * Phân loại thành 2 danh sách: Chờ chụp (pending) và Đã hoàn tất (completed).
  */
-export async function fetchOrdersFromApi(): Promise<{
+export async function fetchOrdersFromApi(
+  group?: string,
+  poNumber?: string,
+  statusId?: number,
+  userGroup?: string
+): Promise<{
   pending: PhotoPackingSummary[]
   completed: PhotoPackingSummary[]
+  total: number
+  data: PhotoPackingSummary[]
 }> {
-  const res = await fetch("/api/orders")
+  const params = new URLSearchParams()
+  const effectiveGroup = userGroup || group
+  if (effectiveGroup && effectiveGroup !== "all") {
+    params.append("userGroup", effectiveGroup)
+    params.append("group", effectiveGroup)
+  }
+  if (poNumber) params.append("poNumber", poNumber)
+  if (statusId !== undefined) params.append("statusId", String(statusId))
+
+  const url = `${BASE_URL}${params.toString() ? `?${params.toString()}` : ""}`
+  const res = await fetch(url)
   if (!res.ok) {
     throw new Error(`Lỗi kết nối Backend API: ${res.status} ${res.statusText}`)
   }
@@ -35,10 +54,17 @@ export async function fetchOrdersFromApi(): Promise<{
     photoUrls: item.photoUrls || [],
   }))
 
-  // Lưu vào bộ nhớ đệm phục vụ tra cứu nhanh khi quét mã
-  setCachedOrders([...pending, ...completed])
+  const allOrders = data.data || [...pending, ...completed]
 
-  return { pending, completed }
+  // Lưu vào bộ nhớ đệm phục vụ tra cứu nhanh khi quét mã
+  setCachedOrders(allOrders)
+
+  return {
+    pending,
+    completed,
+    total: data.total || allOrders.length,
+    data: allOrders,
+  }
 }
 
 /**
@@ -48,7 +74,7 @@ export async function fetchPhotosForOrderApi(
   po: string
 ): Promise<{ photoUrls: string[]; samplePhotoUrl?: string }> {
   try {
-    const res = await fetch(`/api/photos/${encodeURIComponent(po)}`)
+    const res = await fetch(`${BASE_URL}/${encodeURIComponent(po)}/photos`)
     if (res.ok) {
       const data = await res.json()
       return {
@@ -64,7 +90,7 @@ export async function fetchPhotosForOrderApi(
 }
 
 /**
- * Tra cứu thông tin chi tiết một PO từ Backend API (/api/orders/{po})
+ * Tra cứu thông tin chi tiết một PO từ Backend API (/api/photo-packing-summary/{poNumber})
  */
 export async function fetchOrderByPOApi(
   po: string
@@ -80,7 +106,7 @@ export async function fetchOrderByPOApi(
 
   // 2. Gọi trực tiếp API
   try {
-    const res = await fetch(`/api/orders/${encodeURIComponent(cleanPO)}`)
+    const res = await fetch(`${BASE_URL}/${encodeURIComponent(cleanPO)}`)
     if (res.ok) {
       const item: PhotoPackingSummary = await res.json()
       if (item && item.pO) {
@@ -93,7 +119,6 @@ export async function fetchOrderByPOApi(
   }
 
   // 3. Fallback: Nếu PO chưa có trong CSDL, trả về đối tượng cơ bản
-  // (Server vẫn trả về PhotoPackingSummary nếu không tìm thấy PO, chỉ không có thông tin Sản phẩm và ảnh mẫu)
   const defaultPO: PhotoPackingSummary = {
     pO: cleanPO,
     productCode: "",

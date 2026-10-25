@@ -13,8 +13,9 @@ import {
   Sparkles,
   BarChart3,
   ShieldAlert,
+  RotateCcw,
 } from "lucide-react"
-import type { PhotoPackingSummary } from "@/types/photoPackingSummary"
+import type { PhotoPackingSummary } from "@/types"
 import { calculateDashboardMetrics } from "@/services/managerService"
 import OrderPhotoGalleryModal from "@/components/manager/OrderPhotoGalleryModal"
 
@@ -22,12 +23,14 @@ interface ManagerDashboardProps {
   orders: PhotoPackingSummary[]
   onNavigateToPhoto: (tab?: "summary" | "detail") => void
   onNavigateToMaster: (group: "OSA" | "LXA") => void
+  isLoading?: boolean
 }
 
 export default function ManagerDashboard({
   orders,
   onNavigateToPhoto,
   onNavigateToMaster,
+  isLoading = false,
 }: ManagerDashboardProps) {
   // Bộ lọc xưởng trên Dashboard: "all" | "OSA" | "LXA"
   const [selectedGroup, setSelectedGroup] = useState<"all" | "OSA" | "LXA">("all")
@@ -64,6 +67,16 @@ export default function ManagerDashboard({
       percentage: Math.round((count / (filteredOrders.length || 1)) * 100),
     }))
   }, [filteredOrders])
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-16 text-center text-slate-400">
+        <RotateCcw className="h-8 w-8 mx-auto text-blue-500 animate-spin mb-3" />
+        <h3 className="text-base font-bold text-slate-700">Đang tải số liệu bảng điều khiển từ API...</h3>
+        <p className="text-xs text-slate-400 mt-1">Hệ thống đang tổng hợp dữ liệu đơn hàng</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 pb-12">
