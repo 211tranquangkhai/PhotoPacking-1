@@ -6,7 +6,6 @@ import {
   FolderKanban,
   ChevronDown,
   Layers,
-  RefreshCw,
   SlidersHorizontal,
   LogOut,
 } from "lucide-react"
@@ -21,8 +20,6 @@ interface ManagerHeaderProps {
   userGroup?: string
   onLogout?: () => void
   onSwitchToOperator?: () => void
-  onRefreshAll?: () => void
-  isRefreshing?: boolean
 }
 
 export default function ManagerHeader({
@@ -32,8 +29,6 @@ export default function ManagerHeader({
   userGroup,
   onLogout,
   onSwitchToOperator,
-  onRefreshAll,
-  isRefreshing = false,
 }: ManagerHeaderProps) {
   const [isMasterOpen, setIsMasterOpen] = useState(false)
   const masterDropdownRef = useRef<HTMLDivElement>(null)
@@ -186,20 +181,6 @@ export default function ManagerHeader({
 
         {/* ================= 3. Right Corner: Manager Profile (NO AVATAR) & Logout ================= */}
         <div className="flex items-center gap-3">
-          {/* Nút Làm mới dữ liệu */}
-          {onRefreshAll && (
-            <button
-              onClick={onRefreshAll}
-              disabled={isRefreshing}
-              title="Làm mới toàn bộ dữ liệu"
-              className="hidden sm:inline-flex items-center justify-center h-9 w-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin text-blue-600" : ""}`}
-              />
-            </button>
-          )}
-
           {/* Nút chuyển chế độ công nhân (Operator Mode) nếu cần kiểm tra quy trình chụp ảnh */}
           {onSwitchToOperator && (
             <button

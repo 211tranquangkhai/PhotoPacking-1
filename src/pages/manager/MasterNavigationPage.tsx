@@ -16,7 +16,9 @@ import {
   Clock,
   Sparkles,
   FileText,
-  ExternalLink,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
 } from "lucide-react"
 import type { PhotoPackingMasterNavigation, User as UserType } from "@/types"
 import {
@@ -69,6 +71,16 @@ export default function MasterNavigationPage({
 
   // Modal Xem chi tiết ảnh mẫu & thông tin record Master Navigation (80% màn hình)
   const [viewingItem, setViewingItem] = useState<PhotoPackingMasterNavigation | null>(null)
+  const [imageZoom, setImageZoom] = useState<number>(1)
+  const [imageRotation, setImageRotation] = useState<number>(0)
+
+  // Đặt lại zoom và góc xoay về mặc định khi mở modal hoặc đổi ảnh xem
+  useEffect(() => {
+    if (viewingItem) {
+      setImageZoom(1)
+      setImageRotation(0)
+    }
+  }, [viewingItem])
 
   // Toast thông báo
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -526,7 +538,7 @@ export default function MasterNavigationPage({
             </button>
 
             {/* ================= PHẦN BÊN TRÁI: HIỂN THỊ ẢNH MẪU ================= */}
-            <div className="relative w-full md:w-[58%] lg:w-[60%] h-1/2 md:h-full bg-slate-950 flex flex-col items-center justify-center p-6 sm:p-8 select-none">
+            <div className="relative w-full md:w-[58%] lg:w-[60%] h-1/2 md:h-full bg-slate-950 flex flex-col items-center justify-center p-6 sm:p-8 select-none overflow-hidden">
               {/* Badge góc trên của ảnh */}
               <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-3 py-1 text-xs font-bold text-blue-700 shadow-md backdrop-blur-md">
@@ -538,32 +550,98 @@ export default function MasterNavigationPage({
                 </span>
               </div>
 
-              {/* Khung chứa ảnh mẫu lớn */}
+              {/* Khung chứa ảnh mẫu lớn với zoom và xoay */}
               <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
                 <img
                   src={viewingItem.templatePath}
                   alt={`Mẫu ${viewingItem.productKey} - Bước ${viewingItem.stepNo}`}
-                  className="max-h-full max-w-full object-contain rounded-xl shadow-2xl transition-transform duration-300"
+                  style={{
+                    transform: `scale(${imageZoom}) rotate(${imageRotation}deg)`,
+                    transition: "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                  }}
+                  className="max-h-full max-w-full object-contain rounded-xl shadow-2xl select-none"
                   onError={(e) => {
                     ;(e.target as HTMLImageElement).src = "/Image/Template/Tray.jpg"
                   }}
                 />
               </div>
 
-              {/* Caption nhỏ ở đáy ảnh kèm link mở ảnh gốc */}
-              <div className="absolute bottom-4 left-4 right-4 z-10 flex items-center justify-between text-[11px] text-slate-400">
-                <span className="truncate max-w-xs sm:max-w-md font-mono text-slate-400">
-                  {viewingItem.templatePath}
-                </span>
-                <a
-                  href={viewingItem.templatePath}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 hover:underline transition-colors ml-2 flex-shrink-0"
+              {/* Thanh điều khiển Zoom / Rotate nổi phía dưới (bỏ hoàn toàn đường dẫn & nút mở ảnh gốc) */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-slate-900/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-xl text-white">
+                {/* Zoom Out */}
+                <button
+                  type="button"
+                  onClick={() => setImageZoom((z) => Math.max(0.5, Number((z - 0.25).toFixed(2))))}
+                  disabled={imageZoom <= 0.5}
+                  className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer text-slate-200 hover:text-white"
+                  title="Thu nhỏ (-25%)"
                 >
-                  <ExternalLink className="h-3 w-3" />
-                  <span>Mở ảnh gốc</span>
-                </a>
+                  <ZoomOut className="h-4 w-4" />
+                </button>
+
+                {/* Phím bấm % Zoom / Reset */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageZoom(1)
+                    setImageRotation(0)
+                  }}
+                  className="px-2 py-0.5 text-[11px] font-mono font-bold text-slate-300 hover:text-white hover:bg-white/20 rounded-md transition-colors cursor-pointer"
+                  title="Đặt lại 100%"
+                >
+                  {Math.round(imageZoom * 100)}%
+                </button>
+
+                {/* Zoom In */}
+                <button
+                  type="button"
+                  onClick={() => setImageZoom((z) => Math.min(3, Number((z + 0.25).toFixed(2))))}
+                  disabled={imageZoom >= 3}
+                  className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer text-slate-200 hover:text-white"
+                  title="Phóng to (+25%)"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </button>
+
+                <span className="w-px h-3.5 bg-white/20 mx-0.5" />
+
+                {/* Xoay trái */}
+                <button
+                  type="button"
+                  onClick={() => setImageRotation((r) => (r - 90 + 360) % 360)}
+                  className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 transition-all cursor-pointer text-slate-200 hover:text-white"
+                  title="Xoay ngược chiều kim đồng hồ (90°)"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </button>
+
+                {/* Xoay phải */}
+                <button
+                  type="button"
+                  onClick={() => setImageRotation((r) => (r + 90) % 360)}
+                  className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 transition-all cursor-pointer text-slate-200 hover:text-white"
+                  title="Xoay theo chiều kim đồng hồ (90°)"
+                >
+                  <RotateCw className="h-4 w-4" />
+                </button>
+
+                {/* Nút Đặt lại khi có thay đổi */}
+                {(imageZoom !== 1 || imageRotation !== 0) && (
+                  <>
+                    <span className="w-px h-3.5 bg-white/20 mx-0.5" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageZoom(1)
+                        setImageRotation(0)
+                      }}
+                      className="px-2 py-0.5 rounded-full bg-blue-600 hover:bg-blue-500 text-[10px] font-bold text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                      title="Khôi phục kích thước và góc quay ban đầu"
+                    >
+                      Đặt lại
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 

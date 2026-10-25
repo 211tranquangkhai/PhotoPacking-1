@@ -12,6 +12,26 @@ import { loadManagerOrders } from "@/services/managerService"
 import { ArrowLeft, AlertCircle } from "lucide-react"
 
 const USER_STORAGE_KEY = "photo_packing_user"
+const MANAGER_TAB_KEY = "photo_packing_manager_tab"
+const OPERATOR_VIEW_KEY = "photo_packing_operator_view"
+
+// Phân giải URL Hash thành Tab của Manager
+function getTabFromHash(): ManagerNavTab | null {
+  const hash = window.location.hash.toLowerCase()
+  if (hash.includes("photo")) return "photo"
+  if (hash.includes("master")) return "master-navigation"
+  if (hash.includes("dashboard")) return "dashboard"
+  return null
+}
+
+// Phân giải URL Hash thành màn hình của Operator
+function getOperatorViewFromHash(): "orders" | "camera" | "scan" | null {
+  const hash = window.location.hash.toLowerCase()
+  if (hash.includes("scan")) return "scan"
+  if (hash.includes("camera")) return "camera"
+  if (hash.includes("orders")) return "orders"
+  return null
+}
 
 /**
  * App Component - Điều phối:
@@ -19,6 +39,7 @@ const USER_STORAGE_KEY = "photo_packing_user"
  * 2. Chế độ Nhân viên Thao tác (Operator Mode - dành cho Role User)
  * 3. Chế độ Quản lý (Manager Portal - dành cho Role Leader & SubLeader)
  * 4. Tự động truyền nhận và lọc dữ liệu theo userGroup
+ * 5. Tách biệt từng trang qua URL Hash để F5/Reload luôn giữ đúng trang hiện tại
  */
 export default function App() {
   // Người dùng hiện tại (lưu và khôi phục từ localStorage)
@@ -46,8 +67,85 @@ export default function App() {
   })
 
   // Tab điều hướng của Manager: "dashboard" | "photo" | "master-navigation"
-  const [managerTab, setManagerTab] = useState<ManagerNavTab>("dashboard")
+  // Ưu tiên đọc từ URL Hash -> sau đó đến localStorage -> mặc định "dashboard"
+  const [managerTab, setManagerTab] = useState<ManagerNavTab>(() => {
+    const fromHash = getTabFromHash()
+    if (fromHash) return fromHash
+
+    try {
+      const saved = localStorage.getItem(MANAGER_TAB_KEY) as ManagerNavTab | null
+      if (
+        saved &&
+        (saved === "dashboard" ||
+          saved === "photo" ||
+          saved === "master-navigation" ||
+          saved === "master-osa" ||
+          saved === "master-lxa")
+      ) {
+        return saved
+      }
+    } catch {
+      // ignore
+    }
+    return "dashboard"
+  })
+
   const [photoSubTab, setPhotoSubTab] = useState<"summary" | "detail">("detail")
+
+  // Hàm chuyển tab tập trung: Cập nhật state + Lưu localStorage + Đồng bộ URL Hash
+  const navigateManagerTab = useCallback(
+    (tab: ManagerNavTab, photoSub?: "summary" | "detail") => {
+      setManagerTab(tab)
+      if (photoSub) setPhotoSubTab(photoSub)
+
+      try {
+        localStorage.setItem(MANAGER_TAB_KEY, tab)
+      } catch {
+        // ignore
+      }
+
+      const targetHash = `#/${tab}`
+      if (window.location.hash !== targetHash) {
+        window.location.hash = targetHash
+      }
+    },
+    []
+  )
+
+  // Đồng bộ URL Hash lần đầu khi đăng nhập vào Manager
+  useEffect(() => {
+    if (currentUser && appMode === "manager") {
+      const fromHash = getTabFromHash()
+      if (!fromHash) {
+        window.location.hash = `#/${managerTab}`
+      }
+    }
+  }, [currentUser, appMode, managerTab])
+
+  // Lắng nghe sự kiện hashchange để hỗ trợ nút Back / Forward của trình duyệt
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (appMode === "manager") {
+        const tab = getTabFromHash()
+        if (tab && tab !== managerTab) {
+          setManagerTab(tab)
+          try {
+            localStorage.setItem(MANAGER_TAB_KEY, tab)
+          } catch {
+            // ignore
+          }
+        }
+      } else if (appMode === "operator") {
+        const view = getOperatorViewFromHash()
+        if (view) {
+          setOperatorView(view)
+        }
+      }
+    }
+
+    window.addEventListener("hashchange", handleHashChange)
+    return () => window.removeEventListener("hashchange", handleHashChange)
+  }, [appMode, managerTab])
 
   // Dữ liệu đơn hàng PO tải từ Backend API (theo group của user)
   const [orders, setOrders] = useState<PhotoPackingSummary[]>([])
@@ -89,14 +187,15 @@ export default function App() {
     }
 
     // Điều hướng theo Role:
-    // Role "User" -> OrderListPage (chế độ Operator)
-    // Role "Leader" & "SubLeader" -> Manager
     if (user.role === "User") {
       setAppMode("operator")
       setOperatorView("orders")
+      window.location.hash = "#/orders"
     } else {
       setAppMode("manager")
-      setManagerTab("dashboard")
+      const savedTab = (localStorage.getItem(MANAGER_TAB_KEY) as ManagerNavTab) || "dashboard"
+      setManagerTab(savedTab)
+      window.location.hash = `#/${savedTab}`
     }
   }
 
@@ -105,11 +204,14 @@ export default function App() {
     setCurrentUser(null)
     try {
       localStorage.removeItem(USER_STORAGE_KEY)
+      localStorage.removeItem(MANAGER_TAB_KEY)
+      localStorage.removeItem(OPERATOR_VIEW_KEY)
     } catch (err) {
       console.error("Lỗi khi xóa user khỏi localStorage:", err)
     }
     setOrders([])
     setAppMode("manager")
+    window.location.hash = ""
   }
 
   // Profile cho ManagerHeader
@@ -130,17 +232,18 @@ export default function App() {
 
   // Điều hướng từ Dashboard sang Photo
   const handleNavigateToPhoto = (tab: "summary" | "detail" = "detail") => {
-    setPhotoSubTab(tab)
-    setManagerTab("photo")
+    navigateManagerTab("photo", tab)
   }
 
   // Điều hướng từ Dashboard sang Master Navigation
   const handleNavigateToMaster = () => {
-    setManagerTab("master-navigation")
+    navigateManagerTab("master-navigation")
   }
 
   // ================= State cho Chế độ Công nhân (Operator) =================
-  const [operatorView, setOperatorView] = useState<"orders" | "camera" | "scan">("orders")
+  const [operatorView, setOperatorView] = useState<"orders" | "camera" | "scan">(
+    () => getOperatorViewFromHash() || "orders"
+  )
   const [activePO, setActivePO] = useState<string | null>(null)
   const [scannedCodeMeta, setScannedCodeMeta] = useState<{
     format?: string
@@ -234,17 +337,15 @@ export default function App() {
       <ManagerHeader
         currentTab={managerTab}
         onSelectTab={(tab) => {
-          setManagerTab(tab)
-          if (tab === "photo") {
-            setPhotoSubTab("detail")
-          }
+          navigateManagerTab(tab, tab === "photo" ? "detail" : undefined)
         }}
         profile={managerProfile}
         userGroup={userGroup}
         onLogout={handleLogout}
-        onSwitchToOperator={() => setAppMode("operator")}
-        onRefreshAll={refreshOrders}
-        isRefreshing={isRefreshing}
+        onSwitchToOperator={() => {
+          setAppMode("operator")
+          window.location.hash = "#/orders"
+        }}
       />
 
       {/* 2. Main Content Body */}
@@ -282,6 +383,7 @@ export default function App() {
             userGroup={userGroup}
             isLoadingOrders={isRefreshing && orders.length === 0}
             initialTab={photoSubTab}
+            onRefresh={refreshOrders}
           />
         )}
 
